@@ -120,15 +120,11 @@ export function RocketLeagueRankProvider({ children }) {
     }
 
     const currentAccounts = rankCache.accounts || {};
-    const targets = candidates.filter(({ session, username }) => {
+    const staleTargets = candidates.filter(({ session, username }) => {
       const entry = currentAccounts[session.userId];
       return !isCacheEntryFresh(entry, username);
     });
-
-    if (targets.length === 0) {
-      setLastError('');
-      return;
-    }
+    const targets = staleTargets.length > 0 ? staleTargets : candidates;
 
     setIsFetching(true);
     setRemainingCount(targets.length);

@@ -10,6 +10,7 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineInformationCircle,
   HiOutlineXCircle,
+  HiOutlineArrowCircleDown,
   HiViewGrid,
   HiViewList,
   HiPlus,
@@ -25,7 +26,7 @@ import { SelectAndSaveAvatar, RemoveAvatar } from '../../wailsjs/go/services/Ava
 import { useAvatarCache } from '../context/AvatarCacheContext';
 import { getBorderThickness } from '../components/modals/CustomizeAvatarModal/avatarUtils';
 import SuccessSprout from '../components/SuccessSprout';
-import { extractRankStats, getRankModeLabel } from '../lib/rank';
+import { extractRankStats } from '../lib/rank';
 import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
 
 const RANK_STALE_MS = 5 * 60 * 1000;
@@ -232,6 +233,17 @@ export default function Accounts() {
   const activeRankMeta = activeSession ? getRankMeta(activeSession, profiles, selectedPlaylist, nowTick) : null;
   const lowestRankedSession = rankedSessions.find((item) => item.sortBucket === 0 && Number.isFinite(item.sortValue)) || null;
   const nonActiveRankedSessions = rankedSessions.filter((item) => item.session.userId !== activeUserId);
+  const lowerRankedSession = nonActiveRankedSessions.find((item) => {
+    if (item.sortBucket !== 0 || !Number.isFinite(item.sortValue)) return false;
+    if (!activeRankMeta || activeRankMeta.sortBucket !== 0 || !Number.isFinite(activeRankMeta.sortValue)) return true;
+    return item.sortValue < activeRankMeta.sortValue;
+  }) || null;
+  const isCurrentLowestAccount = Boolean(
+    activeSession
+    && activeRankMeta?.sortBucket === 0
+    && Number.isFinite(activeRankMeta.sortValue)
+    && !lowerRankedSession
+  );
   const nonActiveAccountsCount = sessions.filter((session) => session.userId !== activeUserId).length;
   const accountsLabel = 'Select an account to switch';
 
@@ -243,22 +255,23 @@ export default function Accounts() {
       return;
     }
 
-    if (!isCacheLoaded || isLoading || isSwitchingAccount || switchingToId || !lowestRankedSession || !activeSession) {
+    if (!isCacheLoaded || isLoading || isSwitchingAccount || switchingToId || !lowerRankedSession || !activeSession) {
       return;
     }
 
-    if (activeUserId === lowestRankedSession.session.userId) {
+    if (activeUserId === lowerRankedSession.session.userId) {
       autoSwitchAttemptRef.current = null;
       return;
     }
 
-    if (autoSwitchAttemptRef.current === lowestRankedSession.session.userId) {
+    const attemptKey = `${activeUserId || 'none'}:${lowerRankedSession.session.userId}`;
+    if (autoSwitchAttemptRef.current === attemptKey) {
       return;
     }
 
-    autoSwitchAttemptRef.current = lowestRankedSession.session.userId;
-    handleSwitchAccount(lowestRankedSession.session);
-  }, [activeSession, activeUserId, isCacheLoaded, isLoading, isSwitchingAccount, lowestRankedSession, switchingToId]);
+    autoSwitchAttemptRef.current = attemptKey;
+    handleSwitchAccount(lowerRankedSession.session);
+  }, [activeSession, activeUserId, isCacheLoaded, isLoading, isSwitchingAccount, lowerRankedSession, switchingToId]);
 
   function renderRankBadge(rankMeta) {
     if (!rankMeta?.rankInfo) {
@@ -266,7 +279,7 @@ export default function Accounts() {
     }
 
     const rankText = [
-      rankMeta.mmr != null ? `${Math.round(rankMeta.mmr)}` : null,
+      rankMeta.mmr != null ? `${Math.round(rankMeta.mmr)} MMR` : null,
       rankMeta.rankInfo.divisionName,
     ]
       .filter(Boolean)
@@ -280,7 +293,6 @@ export default function Accounts() {
           <div className={styles.rankImageFallback}>RL</div>
         )}
         <div className={styles.rankTextBlock}>
-          <div className={styles.rankLabel}>{getRankModeLabel(selectedPlaylist)}</div>
           <div className={styles.rankValue}>{rankText || 'No rank data'}</div>
         </div>
       </div>
@@ -385,24 +397,35 @@ export default function Accounts() {
                           {renderRankStatus(activeRankMeta)}
                         </div>
 
-                        <div className={styles.lowestAccountActionRow}>
-                          {lowestRankedSession ? (
-                            lowestRankedSession.session.userId === activeUserId ? (
-                              <div className={styles.lowestAccountBadge}>Lowest account</div>
-                            ) : (
+                        {lowestRankedSession && (
+                          <div className={`${styles.lowestAccountPanel} ${lowerRankedSession ? styles.lowestAccountPanelWarning : styles.lowestAccountPanelSuccess}`}>
+                            <div className={styles.lowestAccountPanelIcon}>
+                              {lowerRankedSession ? <HiOutlineArrowCircleDown /> : <HiOutlineCheckCircle />}
+                            </div>
+                            <div className={styles.lowestAccountPanelText}>
+                              <div className={styles.lowestAccountPanelTitle}>
+                                {isCurrentLowestAccount ? 'You are on the lowest account' : 'A lower account is available'}
+                              </div>
+                              <div className={styles.lowestAccountPanelBody}>
+                                {lowerRankedSession
+                                  ? `${lowerRankedSession.displayName} has ${Math.round(lowerRankedSession.sortValue)} MMR.`
+                                  : 'No saved account is lower for the selected playlist.'}
+                              </div>
+                            </div>
+                            {lowerRankedSession && (
                               <button
                                 type="button"
                                 className={styles.lowestAccountButton}
                                 onClick={(event) => {
                                   event.stopPropagation();
-                                  handleSwitchAccount(lowestRankedSession.session);
+                                  handleSwitchAccount(lowerRankedSession.session);
                                 }}
                               >
-                                Switch to lowest account
+                                Switch
                               </button>
-                            )
-                          ) : null}
-                        </div>
+                            )}
+                          </div>
+                        )}
 
                         {isNewSession && (
                           <button
@@ -439,13 +462,13 @@ export default function Accounts() {
 
                     <div className={styles.subtitleControls}>
                       {(isFetching || lastError) && (
-                        <div className={styles.trnStatusRow}>
+                        <div className={styles.fetchStatusRow}>
                           {isFetching && (
-                            <span className={styles.trnStatus}>
+                            <span className={styles.fetchStatus}>
                               Refreshing {remainingCount} account{remainingCount === 1 ? '' : 's'}...
                             </span>
                           )}
-                          {lastError && <span className={styles.trnError}>{lastError}</span>}
+                          {lastError && <span className={styles.fetchError}>{lastError}</span>}
                         </div>
                       )}
 
