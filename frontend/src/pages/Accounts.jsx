@@ -170,6 +170,7 @@ function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
     entry,
     rankInfo,
     mmr: hasMmr ? mmr : null,
+    hasMmr,
     updatedLabel: formatUpdatedLabel(nowTick, entry?.fetchedAt),
     isStale,
     hasError,
@@ -346,17 +347,16 @@ export default function Accounts() {
   }, [nowTick, profiles, selectedPlaylist, sessions]);
 
   const activeRankMeta = activeSession ? getRankMeta(activeSession, profiles, selectedPlaylist, nowTick) : null;
-  const lowestRankedSession = rankedSessions.find((item) => item.sortBucket === 0 && Number.isFinite(item.sortValue)) || null;
+  const lowestRankedSession = rankedSessions.find((item) => Number.isFinite(item.sortValue)) || null;
   const nonActiveRankedSessions = rankedSessions.filter((item) => item.session.userId !== activeUserId);
   const lowerRankedSession = nonActiveRankedSessions.find((item) => {
-    if (item.sortBucket !== 0 || !Number.isFinite(item.sortValue)) return false;
-    if (!activeRankMeta || activeRankMeta.sortBucket !== 0 || !Number.isFinite(activeRankMeta.sortValue)) return true;
+    if (!Number.isFinite(item.sortValue)) return false;
+    if (!activeRankMeta || !Number.isFinite(activeRankMeta.sortValue)) return true;
     return item.sortValue < activeRankMeta.sortValue;
   }) || null;
   const isCurrentLowestAccount = Boolean(
     activeSession
-    && activeRankMeta?.sortBucket === 0
-    && Number.isFinite(activeRankMeta.sortValue)
+    && Number.isFinite(activeRankMeta?.sortValue)
     && !lowerRankedSession
   );
   const nonActiveAccountsCount = sessions.filter((session) => session.userId !== activeUserId).length;
