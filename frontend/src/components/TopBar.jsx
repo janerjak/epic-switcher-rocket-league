@@ -1,7 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useContext } from 'react';
 import { useLocation } from 'react-router-dom';
-import { Minus, Square, Copy, X } from 'lucide-react';
+import { ChevronDown, Copy, Minus, Square, X } from 'lucide-react';
 import styles from './TopBar.module.css';
 import {
   WindowMinimise,
@@ -21,6 +21,8 @@ function TopBar({ className }) {
     return localStorage.getItem(STORAGE_KEYS.WINDOW_BUTTON_STYLE) || 'windows';
   });
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
+  const playlistWrapRef = useRef(null);
   const {
     selectedPlaylist,
     setSelectedPlaylist,
@@ -44,6 +46,27 @@ function TopBar({ className }) {
     return () => window.removeEventListener('resize', syncMaximized);
   }, []);
 
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (playlistWrapRef.current && !playlistWrapRef.current.contains(event.target)) {
+        setIsPlaylistOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsPlaylistOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const handleToggleMaximize = () => {
     WindowToggleMaximise();
     setIsMaximized((prev) => !prev);
@@ -58,21 +81,43 @@ function TopBar({ className }) {
 
       {pathname === '/accounts' && (
         <div className={styles.playlistControls} onDoubleClick={(e) => e.stopPropagation()}>
-          <label className={styles.playlistSelectWrap}>
-            <span className={styles.playlistSelectLabel}>Playlist</span>
-            <select
-              className={styles.playlistSelect}
-              value={selectedPlaylist}
-              onChange={(e) => setSelectedPlaylist(e.target.value)}
-              disabled={isFetching}
+          <div className={styles.playlistDropdown} ref={playlistWrapRef}>
+            <button
+              type="button"
+              className={`${styles.playlistDropdownButton} ${isPlaylistOpen ? styles.playlistDropdownButtonOpen : ''}`}
+              onClick={() => setIsPlaylistOpen((current) => !current)}
+              aria-haspopup="menu"
+              aria-expanded={isPlaylistOpen}
             >
-              {RANK_PLAYLISTS.map((mode) => (
-                <option key={mode.value} value={mode.value}>
-                  {mode.label}
-                </option>
-              ))}
-            </select>
-          </label>
+              <span className={styles.playlistDropdownLabel}>Playlist</span>
+              <span className={styles.playlistDropdownValue}>{RANK_PLAYLISTS.find((mode) => mode.value === selectedPlaylist)?.label || selectedPlaylist}</span>
+              <ChevronDown size={14} className={styles.playlistDropdownChevron} />
+            </button>
+
+            {isPlaylistOpen && (
+              <div className={styles.playlistDropdownMenu} role="menu" aria-label="Playlist selector">
+                {RANK_PLAYLISTS.map((mode) => {
+                  const isActive = selectedPlaylist === mode.value;
+                  return (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      className={`${styles.playlistDropdownItem} ${isActive ? styles.playlistDropdownItemActive : ''}`}
+                      onClick={() => {
+                        setSelectedPlaylist(mode.value);
+                        setIsPlaylistOpen(false);
+                      }}
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                    >
+                      <span className={styles.playlistDropdownItemLabel}>{mode.label}</span>
+                      {isActive && <span className={styles.playlistDropdownItemCheck}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
 
           <button
             type="button"

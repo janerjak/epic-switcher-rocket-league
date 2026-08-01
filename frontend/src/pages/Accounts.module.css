@@ -560,7 +560,9 @@
 }
 
 .listItem:hover {
-  border-color: var(--border-subtle);
+  background: var(--bg-card-hover);
+  border-color: color-mix(in srgb, var(--border-subtle) 70%, var(--text-primary) 10%);
+  box-shadow: var(--shadow-card-hover);
 }
 
 
@@ -615,30 +617,6 @@
 }
 
 
-.itemOverlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  color: white;
-  z-index: 10;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
-  pointer-events: none;
-  backdrop-filter: blur(2px);
-  border-radius: 18px;
-
-}
-
-.listItem:hover .itemOverlay {
-  opacity: 1;
-}
-
 /* ---- Switching state ---- */
 .listItemDisabled {
   pointer-events: none;
@@ -648,25 +626,6 @@
 
 .listItemSwitching {
   opacity: 1;
-}
-
-.itemOverlayVisible {
-  opacity: 1;
-}
-
-.switchingSpinner {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: white;
-  animation: switchingSpin 0.7s linear infinite;
-}
-
-@keyframes switchingSpin {
-  to {
-    transform: rotate(360deg);
-  }
 }
 
 /* ---- Tooltip ---- */
@@ -717,13 +676,13 @@
   align-items: center;
   gap: 8px;
   min-width: 0;
-  padding: 6px 10px;
-  border-radius: 999px;
+  padding: 8px 11px;
+  border-radius: 16px;
   background: color-mix(in srgb, var(--text-primary) 6%, transparent);
   border: 1px solid var(--border-subtle);
 }
 
-.lowestAccountPanel {
+.accountStatusPanel {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr) auto;
   align-items: center;
@@ -733,22 +692,46 @@
   padding: 10px 12px;
   border-radius: 14px;
   text-align: left;
-  box-shadow: 0 12px 30px rgba(0, 0, 0, 0.14);
+  box-shadow: var(--shadow-card-hover);
 }
 
-.lowestAccountPanelSuccess {
+.accountStatusPanelNeutral {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.accountStatusPanelSuccess {
   color: #dcfce7;
   background: linear-gradient(135deg, rgba(22, 101, 52, 0.88), rgba(20, 83, 45, 0.74));
   border: 1px solid rgba(134, 239, 172, 0.32);
 }
 
-.lowestAccountPanelWarning {
+.accountStatusPanelWarning {
   color: #fff7ed;
   background: linear-gradient(135deg, rgba(146, 64, 14, 0.9), rgba(120, 53, 15, 0.76));
   border: 1px solid rgba(253, 186, 116, 0.38);
 }
 
-.lowestAccountPanelIcon {
+.accountStatusPanelError {
+  color: #fee2e2;
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.88), rgba(91, 17, 17, 0.74));
+  border: 1px solid rgba(248, 113, 113, 0.34);
+}
+
+.accountStatusPanelStale {
+  color: #ffedd5;
+  background: linear-gradient(135deg, rgba(124, 58, 9, 0.88), rgba(92, 43, 12, 0.74));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.accountStatusPanelMissing {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.accountStatusPanelIcon {
   display: inline-flex;
   align-items: center;
   justify-content: center;
@@ -760,18 +743,18 @@
   background: rgba(255, 255, 255, 0.14);
 }
 
-.lowestAccountPanelText {
+.accountStatusPanelText {
   min-width: 0;
 }
 
-.lowestAccountPanelTitle {
+.accountStatusPanelTitle {
   color: #fff;
   font-size: 0.84rem;
   font-weight: 800;
   line-height: 1.15;
 }
 
-.lowestAccountPanelBody {
+.accountStatusPanelBody {
   margin-top: 2px;
   color: rgba(255, 255, 255, 0.82);
   font-size: 0.76rem;
@@ -795,7 +778,7 @@
   text-transform: uppercase;
 }
 
-.lowestAccountButton {
+.accountStatusButton {
   align-self: stretch;
   padding: 0 14px;
   color: #431407;
@@ -809,11 +792,11 @@
   transition: background-color 0.15s ease, transform 0.15s ease;
 }
 
-.lowestAccountButton:hover {
+.accountStatusButton:hover {
   background: #ffedd5;
 }
 
-.lowestAccountButton:active {
+.accountStatusButton:active {
   transform: scale(0.98);
 }
 
@@ -845,9 +828,17 @@
   min-width: 0;
 }
 
+.rankMMR {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
 .rankValue {
-  font-size: 0.82rem;
-  line-height: 1.25;
+  font-size: 0.86rem;
+  line-height: 1.2;
   color: var(--text-primary);
   white-space: nowrap;
   overflow: hidden;

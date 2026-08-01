@@ -10,7 +10,6 @@ import {
   HiOutlineExclamationCircle,
   HiOutlineInformationCircle,
   HiOutlineXCircle,
-  HiOutlineArrowCircleDown,
   HiViewGrid,
   HiViewList,
   HiPlus,
@@ -39,6 +38,29 @@ function getFirstVisibleChar(str) {
   return isEmoji ? firstSegment : firstSegment.toUpperCase();
 }
 
+function formatUpdatedLabel(nowTick, fetchedAt) {
+  if (!fetchedAt) return 'Updated a long time ago';
+
+  const parsed = Date.parse(fetchedAt);
+  if (!Number.isFinite(parsed)) return 'Updated a long time ago';
+
+  const diffMs = Math.max(0, nowTick - parsed);
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 60) {
+    const label = diffMinutes <= 1 ? '1 minute' : `${diffMinutes} minutes`;
+    return `Updated ${label} ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    const label = diffHours === 1 ? '1 hour' : `${diffHours} hours`;
+    return `Updated ${label} ago`;
+  }
+
+  return 'Updated a long time ago';
+}
+
 function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
   const entry = profiles?.[session.userId] || null;
   const profile = entry?.profile || null;
@@ -63,6 +85,7 @@ function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
     entry,
     rankInfo,
     mmr: hasMmr ? mmr : null,
+    updatedLabel: formatUpdatedLabel(nowTick, entry?.fetchedAt),
     isStale,
     hasError,
     isMissing,
@@ -247,6 +270,69 @@ export default function Accounts() {
   const nonActiveAccountsCount = sessions.filter((session) => session.userId !== activeUserId).length;
   const accountsLabel = 'Select an account to switch';
 
+  function renderStatusPanel({ meta, lowerSession = null, isCurrentLowest = false }) {
+    const hasLowerSession = Boolean(lowerSession);
+    const variant = hasLowerSession
+      ? 'warning'
+      : isCurrentLowest
+        ? 'success'
+        : meta?.hasError
+          ? 'error'
+          : meta?.isStale
+            ? 'stale'
+            : meta?.isMissing
+              ? 'missing'
+              : 'neutral';
+
+    const icon = variant === 'success'
+      ? <HiOutlineCheckCircle />
+      : variant === 'warning'
+        ? <HiOutlineExclamationCircle />
+        : variant === 'error'
+          ? <HiOutlineXCircle />
+          : variant === 'stale'
+            ? <HiOutlineExclamationCircle />
+            : <HiOutlineInformationCircle />;
+
+    const title = hasLowerSession
+      ? 'Lower account available'
+      : isCurrentLowest
+        ? 'You are on the lowest account'
+        : meta?.hasError
+          ? 'Rank fetch failed'
+          : meta?.isStale
+            ? 'Cached data is outdated'
+            : meta?.isMissing
+              ? 'No cached rank yet'
+              : 'Rank data available';
+
+    const body = hasLowerSession
+      ? `${lowerSession.displayName} is lower for this playlist. ${lowerSession.updatedLabel}.`
+      : `${meta?.updatedLabel || 'Updated a long time ago'}.`;
+
+    return (
+      <div className={`${styles.accountStatusPanel} ${styles[`accountStatusPanel${variant.charAt(0).toUpperCase()}${variant.slice(1)}`]}`}>
+        <div className={styles.accountStatusIcon}>{icon}</div>
+        <div className={styles.accountStatusText}>
+          <div className={styles.accountStatusTitle}>{title}</div>
+          <div className={styles.accountStatusBody}>{body}</div>
+        </div>
+        {hasLowerSession && (
+          <button
+            type="button"
+            className={styles.accountStatusButton}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleSwitchAccount(lowerSession.session);
+            }}
+          >
+            Switch
+          </button>
+        )}
+      </div>
+    );
+  }
+
   useEffect(() => {
     const shouldAutoSwitch = localStorage.getItem(STORAGE_KEYS.AUTO_SWITCH_LOWEST_ACCOUNT) === 'true';
 
@@ -279,7 +365,7 @@ export default function Accounts() {
     }
 
     const rankText = [
-      rankMeta.mmr != null ? `${Math.round(rankMeta.mmr)} MMR` : null,
+      rankMeta.rankInfo.rankName,
       rankMeta.rankInfo.divisionName,
     ]
       .filter(Boolean)
@@ -293,6 +379,9 @@ export default function Accounts() {
           <div className={styles.rankImageFallback}>RL</div>
         )}
         <div className={styles.rankTextBlock}>
+          {rankMeta.mmr != null && (
+            <div className={styles.rankMMR}>{`${Math.round(rankMeta.mmr)} MMR`}</div>
+          )}
           <div className={styles.rankValue}>{rankText || 'No rank data'}</div>
         </div>
       </div>
@@ -326,6 +415,8 @@ export default function Accounts() {
 
     return null;
   }
+
+  const activeLowerSession = activeSession && activeRankMeta && lowerRankedSession ? lowerRankedSession : null;
 
   return (
     <div className={styles.pageWrapper}>
@@ -397,35 +488,11 @@ export default function Accounts() {
                           {renderRankStatus(activeRankMeta)}
                         </div>
 
-                        {lowestRankedSession && (
-                          <div className={`${styles.lowestAccountPanel} ${lowerRankedSession ? styles.lowestAccountPanelWarning : styles.lowestAccountPanelSuccess}`}>
-                            <div className={styles.lowestAccountPanelIcon}>
-                              {lowerRankedSession ? <HiOutlineArrowCircleDown /> : <HiOutlineCheckCircle />}
-                            </div>
-                            <div className={styles.lowestAccountPanelText}>
-                              <div className={styles.lowestAccountPanelTitle}>
-                                {isCurrentLowestAccount ? 'You are on the lowest account' : 'A lower account is available'}
-                              </div>
-                              <div className={styles.lowestAccountPanelBody}>
-                                {lowerRankedSession
-                                  ? `${lowerRankedSession.displayName} has ${Math.round(lowerRankedSession.sortValue)} MMR.`
-                                  : 'No saved account is lower for the selected playlist.'}
-                              </div>
-                            </div>
-                            {lowerRankedSession && (
-                              <button
-                                type="button"
-                                className={styles.lowestAccountButton}
-                                onClick={(event) => {
-                                  event.stopPropagation();
-                                  handleSwitchAccount(lowerRankedSession.session);
-                                }}
-                              >
-                                Switch
-                              </button>
-                            )}
-                          </div>
-                        )}
+                        {renderStatusPanel({
+                          meta: activeRankMeta,
+                          lowerSession: activeLowerSession,
+                          isCurrentLowest: Boolean(isCurrentLowestAccount),
+                        })}
 
                         {isNewSession && (
                           <button
@@ -534,14 +601,11 @@ export default function Accounts() {
                               {renderRankBadge(item)}
                               {renderRankStatus(item)}
                             </div>
-                          </div>
-
-                          <div className={`${styles.itemOverlay} ${isSwitchingToThis ? styles.itemOverlayVisible : ''}`}>
-                            {isSwitchingToThis ? (
-                              <span className={styles.switchingSpinner} />
-                            ) : (
-                              <span>click to switch</span>
-                            )}
+                            {renderStatusPanel({
+                              meta: item,
+                              lowerSession: isLowest ? item : null,
+                              isCurrentLowest: false,
+                            })}
                           </div>
                         </div>
                       );
