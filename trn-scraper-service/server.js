@@ -88,7 +88,7 @@ function parseRating(value) {
 
 function parseDivision(value) {
     const match = (value || "").match(/Division\s+([IVX]+)/i);
-    return match ? `Division ${match[1]}` : null;
+    return match ? `Div ${match[1]}` : null;
 }
 
 function normalizeRow(row) {
@@ -136,8 +136,7 @@ async function scrapeProfile(platform, username) {
     const browser = await getBrowser();
     const context = await browser.newContext({
         locale: "en-US",
-        userAgent:
-            "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
         viewport: { width: 1366, height: 900 },
     });
     const page = await context.newPage();

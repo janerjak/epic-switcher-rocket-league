@@ -25,7 +25,7 @@ import { SelectAndSaveAvatar, RemoveAvatar } from '../../wailsjs/go/services/Ava
 import { useAvatarCache } from '../context/AvatarCacheContext';
 import { getBorderThickness } from '../components/modals/CustomizeAvatarModal/avatarUtils';
 import SuccessSprout from '../components/SuccessSprout';
-import { extractTrnModeStats, getTrnModeLabel } from '../lib/trn';
+import { extractRankStats, getRankModeLabel } from '../lib/rank';
 import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
 
 const RANK_STALE_MS = 5 * 60 * 1000;
@@ -41,7 +41,7 @@ function getFirstVisibleChar(str) {
 function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
   const entry = profiles?.[session.userId] || null;
   const profile = entry?.profile || null;
-  const rankInfo = extractTrnModeStats(profile, selectedPlaylist);
+  const rankInfo = extractRankStats(profile, selectedPlaylist);
   const mmrValue = rankInfo?.mmr;
   const mmr = typeof mmrValue === 'number'
     ? mmrValue
@@ -266,8 +266,8 @@ export default function Accounts() {
     }
 
     const rankText = [
+      rankMeta.mmr != null ? `${Math.round(rankMeta.mmr)}` : null,
       rankMeta.rankInfo.divisionName,
-      rankMeta.mmr != null ? `${Math.round(rankMeta.mmr)} MMR` : null,
     ]
       .filter(Boolean)
       .join(' · ');
@@ -280,7 +280,7 @@ export default function Accounts() {
           <div className={styles.rankImageFallback}>RL</div>
         )}
         <div className={styles.rankTextBlock}>
-          <div className={styles.rankLabel}>{getTrnModeLabel(selectedPlaylist)}</div>
+          <div className={styles.rankLabel}>{getRankModeLabel(selectedPlaylist)}</div>
           <div className={styles.rankValue}>{rankText || 'No rank data'}</div>
         </div>
       </div>

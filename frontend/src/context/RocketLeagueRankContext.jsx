@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { SessionContext } from './SessionContext';
-import { fetchRocketLeagueProfile } from '../lib/trn';
+import { fetchRocketLeagueRankProfile } from '../lib/rank';
 import {
   LoadRankCache,
   SaveRankCache,
@@ -142,7 +142,7 @@ export function RocketLeagueRankProvider({ children }) {
       targets.map(async ({ session, username }) => {
         const existingEntry = currentAccounts[session.userId];
         try {
-          const profile = await fetchRocketLeagueProfile(username, 'epic');
+          const profile = await fetchRocketLeagueRankProfile(username, 'epic');
           nextAccounts[session.userId] = {
             username,
             profile,

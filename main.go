@@ -28,7 +28,7 @@ func main() {
 	systemService := services.NewSystemService()
 		updateService := services.NewUpdateService()
 		avatarService := services.NewAvatarService()
-		rocketLeagueService := services.NewRocketLeagueService()
+		rankService := services.NewRocketLeagueRankService()
 		rankCacheService := services.NewRocketLeagueRankCacheService()
 
 	// Get avatar directory once at startup
@@ -57,7 +57,7 @@ func main() {
 			systemService,
 			updateService,
 			avatarService,
-			rocketLeagueService,
+			rankService,
 			rankCacheService,
 		},
 	})

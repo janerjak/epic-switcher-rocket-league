@@ -13,7 +13,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { LayoutToggle } from './LayoutToggle';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
-import { TRN_RL_MODES } from '../lib/trn';
+import { RANK_PLAYLISTS } from '../lib/rank';
 
 function TopBar({ className }) {
   const { pathname } = useLocation();
@@ -66,7 +66,7 @@ function TopBar({ className }) {
               onChange={(e) => setSelectedPlaylist(e.target.value)}
               disabled={isFetching}
             >
-              {TRN_RL_MODES.map((mode) => (
+              {RANK_PLAYLISTS.map((mode) => (
                 <option key={mode.value} value={mode.value}>
                   {mode.label}
                 </option>

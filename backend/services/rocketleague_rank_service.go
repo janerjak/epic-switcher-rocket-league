@@ -10,13 +10,13 @@ import (
 	"time"
 )
 
-type RocketLeagueService struct{}
+type RocketLeagueRankService struct{}
 
-func NewRocketLeagueService() *RocketLeagueService {
-	return &RocketLeagueService{}
+func NewRocketLeagueRankService() *RocketLeagueRankService {
+	return &RocketLeagueRankService{}
 }
 
-func (r *RocketLeagueService) GetRocketLeagueProfile(username string, platform string) (string, error) {
+func (r *RocketLeagueRankService) GetRocketLeagueRankProfile(username string, platform string) (string, error) {
 	username = strings.TrimSpace(username)
 	platform = strings.TrimSpace(platform)
 
@@ -27,14 +27,14 @@ func (r *RocketLeagueService) GetRocketLeagueProfile(username string, platform s
 		platform = "epic"
 	}
 
-	scraperURL := strings.TrimSpace(os.Getenv("TRN_SCRAPER_URL"))
+	scraperURL := strings.TrimSpace(os.Getenv("RANK_SCRAPER_URL"))
 	if scraperURL == "" {
 		scraperURL = "http://127.0.0.1:7331"
 	}
 
 	endpoint, err := url.Parse(strings.TrimRight(scraperURL, "/") + "/profile")
 	if err != nil {
-		return "", fmt.Errorf("invalid TRN_SCRAPER_URL: %w", err)
+		return "", fmt.Errorf("invalid RANK_SCRAPER_URL: %w", err)
 	}
 
 	query := endpoint.Query()
@@ -62,7 +62,7 @@ func (r *RocketLeagueService) GetRocketLeagueProfile(username string, platform s
 	}
 
 	if resp.StatusCode < 200 || resp.StatusCode >= 300 {
-		return "", fmt.Errorf("TRN scraper returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
+		return "", fmt.Errorf("rank scraper returned %d: %s", resp.StatusCode, strings.TrimSpace(string(body)))
 	}
 
 	return string(body), nil

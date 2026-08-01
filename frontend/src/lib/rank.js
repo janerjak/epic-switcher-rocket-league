@@ -1,6 +1,6 @@
-import { GetRocketLeagueProfile } from '../../wailsjs/go/services/RocketLeagueService';
+import { GetRocketLeagueRankProfile } from '../../wailsjs/go/services/RocketLeagueRankService';
 
-export const TRN_RL_MODES = [
+export const RANK_PLAYLISTS = [
   { value: 'duel', label: '1v1', aliases: ['duel', '1v1', 'solo', 'solos'] },
   { value: 'double', label: '2v2', aliases: ['double', 'doubles', '2v2'] },
   { value: 'standard', label: '3v3', aliases: ['standard', 'trio', 'trios', '3v3'] },
@@ -11,16 +11,16 @@ export const TRN_RL_MODES = [
   { value: 'tournament', label: 'Tournament', aliases: ['tournament'] },
 ];
 
-export function getTrnModeLabel(mode) {
-  return TRN_RL_MODES.find((item) => item.value === mode)?.label || mode;
+export function getRankModeLabel(mode) {
+  return RANK_PLAYLISTS.find((item) => item.value === mode)?.label || mode;
 }
 
 export function getPlaylistLabel(mode) {
-  return getTrnModeLabel(mode);
+  return getRankModeLabel(mode);
 }
 
-export async function fetchRocketLeagueProfile(username, platform = 'epic') {
-  const raw = await GetRocketLeagueProfile(username, platform);
+export async function fetchRocketLeagueRankProfile(username, platform = 'epic') {
+  const raw = await GetRocketLeagueRankProfile(username, platform);
   return JSON.parse(raw);
 }
 
@@ -46,10 +46,10 @@ function normalizeRankBlock(block) {
 
 function matchesMode(text, mode) {
     const target = (text || "").toString().toLowerCase();
-    return TRN_RL_MODES.find((item) => item.value === mode)?.aliases.some((alias) => target.includes(alias)) || false;
+    return RANK_PLAYLISTS.find((item) => item.value === mode)?.aliases.some((alias) => target.includes(alias)) || false;
 }
 
-export function extractTrnModeStats(profileResponse, mode) {
+export function extractRankStats(profileResponse, mode) {
   const root = profileResponse?.data || profileResponse || {};
 
   const nestedCandidates = [`stats.ranked.${mode}`, `stats.ranked.${mode}s`, `stats.${mode}`, `ranked.${mode}`, `ranked.${mode}s`];
