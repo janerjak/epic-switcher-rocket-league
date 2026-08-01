@@ -1,3 +1,4 @@
+import { createPortal } from 'react-dom';
 import { useEffect, useContext, useMemo, useRef, useState } from 'react';
 import { useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
@@ -61,6 +62,80 @@ function formatUpdatedLabel(nowTick, fetchedAt) {
   return 'Updated a long time ago';
 }
 
+function RowStatusChip({ meta }) {
+  const chipRef = useRef(null);
+  const closeTimerRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ top: 0, left: 0 });
+
+  const statusKind = meta?.statusKind;
+  const shouldRender = statusKind === 'error' || statusKind === 'stale' || statusKind === 'unranked';
+
+  useEffect(() => {
+    if (!isOpen || !chipRef.current) return;
+
+    const rect = chipRef.current.getBoundingClientRect();
+    const popoverWidth = 280;
+    const left = Math.max(12, Math.min(rect.right + 10, window.innerWidth - popoverWidth - 12));
+    const top = Math.max(12, rect.top - 2);
+    setAnchor({ top, left });
+  }, [isOpen]);
+
+  if (!shouldRender) return null;
+
+  const openPopover = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsOpen(true);
+  };
+
+  const closePopover = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => setIsOpen(false), 80);
+  };
+
+  const variant = statusKind === 'error' || statusKind === 'unranked' ? 'error' : 'stale';
+  const icon = variant === 'error' ? <HiOutlineXCircle /> : <HiOutlineExclamationCircle />;
+  const title = variant === 'error' ? 'Unranked account' : 'Cached data is outdated';
+  const body = variant === 'error'
+    ? 'No ranked data was returned when this account was fetched.'
+    : 'Refresh to load newer cached data.';
+
+  return (
+    <div className={styles.rowStatusWrap}>
+      <button
+        ref={chipRef}
+        type="button"
+        className={`${styles.rowStatusChip} ${styles[`rowStatusChip${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}
+        aria-label={title}
+        onMouseEnter={openPopover}
+        onMouseLeave={closePopover}
+        onFocus={openPopover}
+        onBlur={closePopover}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {icon}
+      </button>
+
+      {isOpen && createPortal(
+        <div
+          className={`${styles.rowStatusPopover} ${styles[`rowStatusPopover${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}
+          style={{ top: `${anchor.top}px`, left: `${anchor.left}px` }}
+          onMouseEnter={openPopover}
+          onMouseLeave={closePopover}
+        >
+          <div className={styles.rowStatusPopoverTitle}>{title}</div>
+          <div className={styles.rowStatusPopoverBody}>{body}</div>
+          <div className={styles.rowStatusPopoverMeta}>{meta?.updatedLabel || 'Updated a long time ago'}</div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
 function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
   const entry = profiles?.[session.userId] || null;
   const profile = entry?.profile || null;
@@ -77,8 +152,18 @@ function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
   const isStale = Number.isFinite(fetchedAt) ? nowTick - fetchedAt > RANK_STALE_MS : false;
   const hasError = Boolean(entry?.error);
   const hasProfile = Boolean(profile);
-  const isMissing = !entry || (!hasProfile && !hasError) || !hasMmr;
-  const sortBucket = hasError || isMissing ? 1 : 0;
+  const isUnranked = Boolean(entry && hasProfile && !hasMmr && !hasError);
+  const isMissing = !entry;
+  const statusKind = hasError
+    ? 'error'
+    : isUnranked
+      ? 'unranked'
+      : isStale
+        ? 'stale'
+        : isMissing
+          ? 'missing'
+          : 'ready';
+  const sortBucket = statusKind === 'ready' ? 0 : 1;
   const sortValue = hasMmr ? mmr : Number.POSITIVE_INFINITY;
 
   return {
@@ -88,7 +173,9 @@ function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
     updatedLabel: formatUpdatedLabel(nowTick, entry?.fetchedAt),
     isStale,
     hasError,
+    isUnranked,
     isMissing,
+    statusKind,
     sortBucket,
     sortValue,
   };
@@ -272,10 +359,17 @@ export default function Accounts() {
 
   function renderActiveStatusPanel({ meta, lowerSession = null, isCurrentLowest = false }) {
     const hasLowerSession = Boolean(lowerSession);
+    const isUnranked = meta?.statusKind === 'unranked';
+    if (!hasLowerSession && !isCurrentLowest && !isUnranked && !meta?.hasError && !meta?.isStale && !meta?.isMissing) {
+      return null;
+    }
+
     const variant = hasLowerSession
       ? 'warning'
       : isCurrentLowest
         ? 'success'
+        : isUnranked
+          ? 'error'
         : meta?.hasError
           ? 'error'
           : meta?.isStale
@@ -295,9 +389,11 @@ export default function Accounts() {
             : <HiOutlineInformationCircle />;
 
     const title = hasLowerSession
-      ? 'Lower account available'
+      ? 'Lower account available:'
       : isCurrentLowest
         ? 'You are on the lowest account'
+        : isUnranked
+          ? 'Unranked account'
         : meta?.hasError
           ? 'Rank fetch failed'
           : meta?.isStale
@@ -329,58 +425,6 @@ export default function Accounts() {
             Switch
           </button>
         )}
-      </div>
-    );
-  }
-
-  function renderRowStatusChip(meta) {
-    const variant = meta?.hasError
-      ? 'error'
-      : meta?.isStale
-        ? 'stale'
-        : meta?.isMissing
-          ? 'missing'
-          : 'neutral';
-
-    const icon = variant === 'error'
-      ? <HiOutlineXCircle />
-      : variant === 'stale'
-        ? <HiOutlineExclamationCircle />
-        : <HiOutlineInformationCircle />;
-
-    const title = meta?.hasError
-      ? 'Rank fetch failed'
-      : meta?.isStale
-        ? 'Cached data is outdated'
-        : meta?.isMissing
-          ? 'No cached rank yet'
-          : 'Rank data available';
-
-    const body = meta?.hasError
-      ? meta?.entry?.error || 'Try Fetch to retry.'
-      : meta?.isStale
-        ? 'The cache is older than 5 minutes.'
-        : meta?.isMissing
-          ? 'No rank data has been saved yet.'
-          : 'This account is up to date.';
-
-    const tooltipLabel = meta?.updatedLabel || 'Updated a long time ago';
-
-    return (
-      <div className={styles.rowStatusWrap}>
-        <button
-          type="button"
-          className={`${styles.rowStatusChip} ${styles[`rowStatusChip${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}
-          aria-label={title}
-          onClick={(event) => event.stopPropagation()}
-        >
-          {icon}
-        </button>
-        <div className={`${styles.rowStatusPopover} ${styles[`rowStatusPopover${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}>
-          <div className={styles.rowStatusPopoverTitle}>{title}</div>
-          <div className={styles.rowStatusPopoverBody}>{body}</div>
-          <div className={styles.rowStatusPopoverMeta}>{tooltipLabel}</div>
-        </div>
       </div>
     );
   }
@@ -441,9 +485,9 @@ export default function Accounts() {
   }
 
   function renderRankStatus(rankMeta) {
-    if (rankMeta?.hasError) {
+    if (rankMeta?.hasError || rankMeta?.isUnranked) {
       return (
-        <span className={`${styles.rankStatusIcon} ${styles.rankStatusError}`} title={rankMeta.entry?.error || 'Rank fetch failed'}>
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusError}`} title={rankMeta?.isUnranked ? 'Unranked account' : (rankMeta.entry?.error || 'Rank fetch failed')}>
           <HiOutlineXCircle />
         </span>
       );
@@ -654,7 +698,7 @@ export default function Accounts() {
                             </div>
                           </div>
                           <div className={styles.rowStatusCell}>
-                            {renderRowStatusChip(item)}
+                            <RowStatusChip meta={item} />
                           </div>
                         </div>
                       );

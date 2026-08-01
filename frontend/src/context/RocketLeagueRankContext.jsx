@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from 'react';
 import { SessionContext } from './SessionContext';
-import { fetchRocketLeagueRankProfile } from '../lib/rank';
+import { extractRankStats, fetchRocketLeagueRankProfile } from '../lib/rank';
 import {
   LoadRankCache,
   SaveRankCache,
@@ -47,6 +47,17 @@ function getErrorMessage(error) {
   if (!error) return 'Unknown playlist fetch error.';
   if (typeof error === 'string') return error;
   return error.message || String(error);
+}
+
+function getFetchPriority(entry, username, playlist) {
+  if (!entry || entry.username !== username) return 'error';
+  if (entry.error) return 'error';
+
+  const playlistStats = extractRankStats(entry.profile, playlist);
+  if (!playlistStats?.mmr) return 'error';
+  if (isCacheEntryStale(entry)) return 'stale';
+
+  return 'ready';
 }
 
 export function RocketLeagueRankProvider({ children }) {
@@ -120,11 +131,23 @@ export function RocketLeagueRankProvider({ children }) {
     }
 
     const currentAccounts = rankCache.accounts || {};
-    const staleTargets = candidates.filter(({ session, username }) => {
+    const prioritized = candidates.map(({ session, username }) => {
       const entry = currentAccounts[session.userId];
-      return !isCacheEntryFresh(entry, username);
+      const priority = getFetchPriority(entry, username, selectedPlaylist);
+
+      return { session, username, entry, priority };
     });
-    const targets = staleTargets.length > 0 ? staleTargets : candidates;
+
+    const errorTargets = prioritized.filter((item) => item.priority === 'error');
+    const staleTargets = prioritized.filter((item) => item.priority === 'stale');
+    const readyTargets = prioritized.filter((item) => item.priority === 'ready');
+    const targets = errorTargets.length > 0
+      ? errorTargets
+      : staleTargets.length > 0
+        ? staleTargets
+        : readyTargets.length > 0
+          ? readyTargets
+          : candidates;
 
     setIsFetching(true);
     setRemainingCount(targets.length);
