@@ -7,6 +7,7 @@ import (
 	"epic-games-account-switcher/backend"
 	"epic-games-account-switcher/backend/middleware"
 	"epic-games-account-switcher/backend/services"
+	"epic-games-account-switcher/backend/utils"
 
 	"github.com/wailsapp/wails/v2"
 	"github.com/wailsapp/wails/v2/pkg/options"
@@ -17,6 +18,8 @@ import (
 var assets embed.FS
 
 func main() {
+	utils.LoadEnvFiles(".env", ".env.local")
+
 	app := backend.NewApp()
 	authService := services.NewAuthService()
 	sessionStore := services.NewSessionStore()
@@ -25,6 +28,7 @@ func main() {
 	systemService := services.NewSystemService()
 	updateService := services.NewUpdateService()
 	avatarService := services.NewAvatarService()
+	rocketLeagueService := services.NewRocketLeagueService()
 
 	// Get avatar directory once at startup
 	avatarDir := sessionStore.GetAvatarDir()
@@ -52,6 +56,7 @@ func main() {
 			systemService,
 			updateService,
 			avatarService,
+			rocketLeagueService,
 		},
 	})
 

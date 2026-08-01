@@ -179,6 +179,12 @@
   text-overflow: ellipsis;
 }
 
+.activeRankRow {
+  display: flex;
+  justify-content: center;
+  margin-top: 6px;
+}
+
 .activeAccountSide {
   position: absolute;
   top: 18px;
@@ -363,6 +369,60 @@
 .subtitleWithIcon {
   display: flex;
   align-items: center;
+}
+
+.subtitleControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.modeSelectWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface);
+}
+
+.modeSelectLabel {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.modeSelect {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+
+.trnStatusRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.trnStatus,
+.trnError {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.trnStatus {
+  color: var(--text-secondary);
+}
+
+.trnError {
+  color: #ef4444;
 }
 
 .addIcon {
@@ -622,6 +682,62 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.rankBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 6px 10px;
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.rankImage,
+.rankImageFallback {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.rankImage {
+  object-fit: cover;
+}
+
+.rankImageFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.rankTextBlock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rankLabel {
+  font-size: 0.68rem;
+  line-height: 1;
+  color: var(--text-secondary);
+  text-transform: uppercase;
+  letter-spacing: 0.08em;
+}
+
+.rankValue {
+  font-size: 0.82rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .displayName {
