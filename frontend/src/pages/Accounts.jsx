@@ -263,6 +263,9 @@ export default function Accounts() {
       const stored = localStorage.getItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH);
       const launchMinimized = stored !== null ? stored === 'true' : true;
       await SwitchAccount(session, launchMinimized);
+      setTimeout(() => {
+        checkLoginStatus();
+      }, 1000);
       setLastSwitchedId(session.userId);
 
       setTimeout(() => {
@@ -271,7 +274,6 @@ export default function Accounts() {
     } catch (error) {
       console.error(error);
       toast.error('Failed to switch account.', { id: 'switch-account-error' });
-      setPendingSwitchUserId(null);
     } finally {
       setSwitchingToId(null);
       setIsSwitchingAccount(false);
