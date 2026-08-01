@@ -194,7 +194,6 @@ export default function Accounts() {
     checkLoginStatus,
     isSwitchingAccount,
     setIsSwitchingAccount,
-    setPendingSwitchUserId,
   } = useContext(AuthContext);
 
   const { viewMode, setViewMode } = useContext(ViewModeContext);
@@ -259,14 +258,11 @@ export default function Accounts() {
 
     setIsSwitchingAccount(true);
     setSwitchingToId(session.userId);
-    setPendingSwitchUserId(session.userId);
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH);
       const launchMinimized = stored !== null ? stored === 'true' : true;
       await SwitchAccount(session, launchMinimized);
-      setTimeout(() => {
-        checkLoginStatus();
-      }, 1000);
+      setActiveLoginSession(session);
       setLastSwitchedId(session.userId);
 
       setTimeout(() => {
@@ -278,7 +274,6 @@ export default function Accounts() {
     } finally {
       setSwitchingToId(null);
       setIsSwitchingAccount(false);
-      setTimeout(() => setPendingSwitchUserId((current) => current === session.userId ? null : current), 15000);
     }
   }
 
@@ -369,7 +364,9 @@ export default function Accounts() {
       return null;
     }
 
-    const variant = hasLowerSession
+    const variant = meta?.isMissing
+      ? 'missing'
+      : hasLowerSession
       ? 'warning'
       : isCurrentLowest
         ? 'success'
@@ -393,7 +390,9 @@ export default function Accounts() {
             ? <HiOutlineExclamationCircle />
             : <HiOutlineInformationCircle />;
 
-    const title = hasLowerSession
+    const title = meta?.isMissing
+      ? 'No rank data available'
+      : hasLowerSession
       ? 'Lower account available:'
       : isCurrentLowest
         ? 'You are on the lowest account'
@@ -407,7 +406,9 @@ export default function Accounts() {
               ? 'No cached rank yet'
               : 'Rank data available';
 
-    const body = hasLowerSession
+    const body = meta?.isMissing
+      ? activeSession?.alias || activeSession?.username || activeSession?.userId || ''
+      : hasLowerSession
       ? lowerSession.displayName
       : activeSession?.alias || activeSession?.username || activeSession?.userId || '';
 

@@ -1,4 +1,4 @@
-import { createContext, useState, useEffect, useCallback, useRef } from 'react';
+import { createContext, useState, useEffect, useCallback } from 'react';
 import { GetCurrentLoginSession, DetectNewLoginSession, CheckIfSessionIsNew, CheckAndRenewLoginToken } from '../../wailsjs/go/services/AuthService';
 import { GetUsernameForUserID } from '../../wailsjs/go/services/LogReaderService';
 
@@ -10,57 +10,27 @@ export function AuthProvider({ children }) {
   const [newLoginSession, setNewLoginSession] = useState(null);         // only if new account detected
   const [newLoginUsername, setNewLoginUsername] = useState("");
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);  // true while an account switch is in flight
-  const [pendingSwitchUserId, setPendingSwitchUserId] = useState(null);
-  const activeLoginSessionRef = useRef(null);
-  const pendingSwitchUserIdRef = useRef(null);
-  const isSwitchingAccountRef = useRef(false);
-
-  useEffect(() => {
-    activeLoginSessionRef.current = activeLoginSession;
-  }, [activeLoginSession]);
-
-  useEffect(() => {
-    pendingSwitchUserIdRef.current = pendingSwitchUserId;
-  }, [pendingSwitchUserId]);
-
-  useEffect(() => {
-    isSwitchingAccountRef.current = isSwitchingAccount;
-  }, [isSwitchingAccount]);
 
   const checkLoginStatus = useCallback(async () => {
     try {
       console.log("🔑 Checking Epic login state...");
 
-      const currentActiveSession = activeLoginSessionRef.current;
-      const currentPendingSwitchUserId = pendingSwitchUserIdRef.current;
-      const switchingAccount = isSwitchingAccountRef.current;
       const currentSession = await GetCurrentLoginSession();
 
       // 0. renew login token if needed
-      if (currentSession?.userId && !currentPendingSwitchUserId) {
+      if (currentSession?.userId) {
         await CheckAndRenewLoginToken();
       }
 
       // 1. detect current session
       if (currentSession?.userId) {
-        if (currentPendingSwitchUserId && currentSession.userId !== currentPendingSwitchUserId) {
-          if (currentActiveSession?.userId && currentSession.userId === currentActiveSession.userId) {
-            setIsLoggedIn(true);
-          }
-          return;
-        }
-
         setActiveLoginSession(currentSession);
         setIsLoggedIn(true);
 
         const isNew = await CheckIfSessionIsNew(currentSession.userId);
         setNewLoginSession(isNew ? currentSession : null);
-
-        if (currentPendingSwitchUserId === currentSession.userId) {
-          setPendingSwitchUserId(null);
-        }
       } else {
-        if (!switchingAccount && !currentPendingSwitchUserId) {
+        if (!isSwitchingAccount) {
           setActiveLoginSession(null);
         }
         setIsLoggedIn(false);
@@ -74,7 +44,7 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.log("ℹ️ Login detection info:", err);
       setIsLoggedIn(false);
-      if (!isSwitchingAccountRef.current && !pendingSwitchUserIdRef.current) {
+      if (!isSwitchingAccount) {
         setActiveLoginSession(null);
       }
       setNewLoginSession(null);
@@ -121,8 +91,6 @@ export function AuthProvider({ children }) {
         checkLoginStatus,
         isSwitchingAccount,
         setIsSwitchingAccount,
-        pendingSwitchUserId,
-        setPendingSwitchUserId,
       }}
     >
       {children}
