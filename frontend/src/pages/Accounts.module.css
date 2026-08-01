@@ -518,9 +518,10 @@
 
 /* ---- Container Views ---- */
 .listContainer {
-  max-height: 70vh;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   padding-top: 2px;
+  padding-bottom: 12px;
 }
 
 .listView {
@@ -689,8 +690,8 @@
   gap: 10px;
   width: min(420px, 100%);
   margin-top: 10px;
-  padding: 10px 12px;
-  border-radius: 14px;
+  padding: 8px 10px;
+  border-radius: 12px;
   text-align: left;
   box-shadow: var(--shadow-card-hover);
 }
@@ -735,8 +736,8 @@
   display: inline-flex;
   align-items: center;
   justify-content: center;
-  width: 28px;
-  height: 28px;
+  width: 26px;
+  height: 26px;
   flex-shrink: 0;
   border-radius: 9px;
   font-size: 1.1rem;
@@ -749,7 +750,7 @@
 
 .accountStatusPanelTitle {
   color: #fff;
-  font-size: 0.84rem;
+  font-size: 0.82rem;
   font-weight: 800;
   line-height: 1.15;
 }
@@ -757,9 +758,9 @@
 .accountStatusPanelBody {
   margin-top: 2px;
   color: rgba(255, 255, 255, 0.82);
-  font-size: 0.76rem;
+  font-size: 0.74rem;
   font-weight: 500;
-  line-height: 1.3;
+  line-height: 1.2;
 }
 
 .lowestListBadge {
@@ -779,14 +780,15 @@
 }
 
 .accountStatusButton {
-  align-self: stretch;
-  padding: 0 14px;
+  align-self: center;
+  height: 28px;
+  padding: 0 12px;
   color: #431407;
   background: #fed7aa;
   border: 1px solid rgba(255, 237, 213, 0.7);
-  border-radius: 10px;
+  border-radius: 8px;
   cursor: pointer;
-  font-size: 0.8rem;
+  font-size: 0.78rem;
   font-weight: 800;
   font-family: inherit;
   transition: background-color 0.15s ease, transform 0.15s ease;
@@ -843,6 +845,111 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.rowStatusCell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-left: auto;
+}
+
+.rowStatusWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.rowStatusChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.rowStatusChipError {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.rowStatusChipStale {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.rowStatusChipMissing {
+  color: var(--text-secondary);
+}
+
+.rowStatusPopover {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  min-width: 220px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 15, 15, 0.96);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 30;
+}
+
+.rowStatusWrap:hover .rowStatusPopover,
+.rowStatusWrap:focus-within .rowStatusPopover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.rowStatusPopoverTitle {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.rowStatusPopoverBody {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.rowStatusPopoverMeta {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.rowStatusPopoverError .rowStatusPopoverTitle,
+.rowStatusPopoverError .rowStatusPopoverBody,
+.rowStatusPopoverError .rowStatusPopoverMeta {
+  color: #fecaca;
+}
+
+.rowStatusPopoverStale .rowStatusPopoverTitle,
+.rowStatusPopoverStale .rowStatusPopoverBody,
+.rowStatusPopoverStale .rowStatusPopoverMeta {
+  color: #fef3c7;
+}
+
+.rowStatusPopoverMissing .rowStatusPopoverTitle,
+.rowStatusPopoverMissing .rowStatusPopoverBody,
+.rowStatusPopoverMissing .rowStatusPopoverMeta {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .displayName {

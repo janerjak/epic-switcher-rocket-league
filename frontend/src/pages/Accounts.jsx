@@ -270,7 +270,7 @@ export default function Accounts() {
   const nonActiveAccountsCount = sessions.filter((session) => session.userId !== activeUserId).length;
   const accountsLabel = 'Select an account to switch';
 
-  function renderStatusPanel({ meta, lowerSession = null, isCurrentLowest = false }) {
+  function renderActiveStatusPanel({ meta, lowerSession = null, isCurrentLowest = false }) {
     const hasLowerSession = Boolean(lowerSession);
     const variant = hasLowerSession
       ? 'warning'
@@ -307,15 +307,15 @@ export default function Accounts() {
               : 'Rank data available';
 
     const body = hasLowerSession
-      ? `${lowerSession.displayName} is lower for this playlist. ${lowerSession.updatedLabel}.`
-      : `${meta?.updatedLabel || 'Updated a long time ago'}.`;
+      ? lowerSession.displayName
+      : activeSession?.alias || activeSession?.username || activeSession?.userId || '';
 
     return (
-      <div className={`${styles.accountStatusPanel} ${styles[`accountStatusPanel${variant.charAt(0).toUpperCase()}${variant.slice(1)}`]}`}>
-        <div className={styles.accountStatusIcon}>{icon}</div>
-        <div className={styles.accountStatusText}>
-          <div className={styles.accountStatusTitle}>{title}</div>
-          <div className={styles.accountStatusBody}>{body}</div>
+      <div className={`${styles.accountStatusPanel} ${styles[`accountStatusPanel${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}>
+        <div className={styles.accountStatusPanelIcon}>{icon}</div>
+        <div className={styles.accountStatusPanelText}>
+          <div className={styles.accountStatusPanelTitle}>{title}</div>
+          <div className={styles.accountStatusPanelBody}>{body}</div>
         </div>
         {hasLowerSession && (
           <button
@@ -329,6 +329,58 @@ export default function Accounts() {
             Switch
           </button>
         )}
+      </div>
+    );
+  }
+
+  function renderRowStatusChip(meta) {
+    const variant = meta?.hasError
+      ? 'error'
+      : meta?.isStale
+        ? 'stale'
+        : meta?.isMissing
+          ? 'missing'
+          : 'neutral';
+
+    const icon = variant === 'error'
+      ? <HiOutlineXCircle />
+      : variant === 'stale'
+        ? <HiOutlineExclamationCircle />
+        : <HiOutlineInformationCircle />;
+
+    const title = meta?.hasError
+      ? 'Rank fetch failed'
+      : meta?.isStale
+        ? 'Cached data is outdated'
+        : meta?.isMissing
+          ? 'No cached rank yet'
+          : 'Rank data available';
+
+    const body = meta?.hasError
+      ? meta?.entry?.error || 'Try Fetch to retry.'
+      : meta?.isStale
+        ? 'The cache is older than 5 minutes.'
+        : meta?.isMissing
+          ? 'No rank data has been saved yet.'
+          : 'This account is up to date.';
+
+    const tooltipLabel = meta?.updatedLabel || 'Updated a long time ago';
+
+    return (
+      <div className={styles.rowStatusWrap}>
+        <button
+          type="button"
+          className={`${styles.rowStatusChip} ${styles[`rowStatusChip${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}
+          aria-label={title}
+          onClick={(event) => event.stopPropagation()}
+        >
+          {icon}
+        </button>
+        <div className={`${styles.rowStatusPopover} ${styles[`rowStatusPopover${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}>
+          <div className={styles.rowStatusPopoverTitle}>{title}</div>
+          <div className={styles.rowStatusPopoverBody}>{body}</div>
+          <div className={styles.rowStatusPopoverMeta}>{tooltipLabel}</div>
+        </div>
       </div>
     );
   }
@@ -488,7 +540,7 @@ export default function Accounts() {
                           {renderRankStatus(activeRankMeta)}
                         </div>
 
-                        {renderStatusPanel({
+                        {renderActiveStatusPanel({
                           meta: activeRankMeta,
                           lowerSession: activeLowerSession,
                           isCurrentLowest: Boolean(isCurrentLowestAccount),
@@ -599,13 +651,10 @@ export default function Accounts() {
                             </div>
                             <div className={styles.inlineRow}>
                               {renderRankBadge(item)}
-                              {renderRankStatus(item)}
                             </div>
-                            {renderStatusPanel({
-                              meta: item,
-                              lowerSession: isLowest ? item : null,
-                              isCurrentLowest: false,
-                            })}
+                          </div>
+                          <div className={styles.rowStatusCell}>
+                            {renderRowStatusChip(item)}
                           </div>
                         </div>
                       );
