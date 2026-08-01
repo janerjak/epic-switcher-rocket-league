@@ -10,6 +10,7 @@ export function AuthProvider({ children }) {
   const [newLoginSession, setNewLoginSession] = useState(null);         // only if new account detected
   const [newLoginUsername, setNewLoginUsername] = useState("");
   const [isSwitchingAccount, setIsSwitchingAccount] = useState(false);  // true while an account switch is in flight
+  const [pendingSwitchUserId, setPendingSwitchUserId] = useState(null);
 
   const checkLoginStatus = useCallback(async () => {
     try {
@@ -18,17 +19,33 @@ export function AuthProvider({ children }) {
       const currentSession = await GetCurrentLoginSession();
 
       // 0. renew login token if needed
-      if (currentSession?.userId) {
+      if (currentSession?.userId && !pendingSwitchUserId) {
         await CheckAndRenewLoginToken();
       }
 
       // 1. detect current session
       if (currentSession?.userId) {
+        if (pendingSwitchUserId && currentSession.userId !== pendingSwitchUserId) {
+          if (activeLoginSession?.userId && currentSession.userId === activeLoginSession.userId) {
+            setPendingSwitchUserId(null);
+            setActiveLoginSession(currentSession);
+            setIsLoggedIn(true);
+
+            const isNew = await CheckIfSessionIsNew(currentSession.userId);
+            setNewLoginSession(isNew ? currentSession : null);
+          }
+          return;
+        }
+
         setActiveLoginSession(currentSession);
         setIsLoggedIn(true);
 
         const isNew = await CheckIfSessionIsNew(currentSession.userId);
         setNewLoginSession(isNew ? currentSession : null);
+
+        if (pendingSwitchUserId === currentSession.userId) {
+          setPendingSwitchUserId(null);
+        }
       } else {
         if (!isSwitchingAccount) {
           setActiveLoginSession(null);
@@ -91,6 +108,8 @@ export function AuthProvider({ children }) {
         checkLoginStatus,
         isSwitchingAccount,
         setIsSwitchingAccount,
+        pendingSwitchUserId,
+        setPendingSwitchUserId,
       }}
     >
       {children}

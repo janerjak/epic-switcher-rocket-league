@@ -193,6 +193,7 @@ export default function Accounts() {
     checkLoginStatus,
     isSwitchingAccount,
     setIsSwitchingAccount,
+    setPendingSwitchUserId,
   } = useContext(AuthContext);
 
   const { viewMode, setViewMode } = useContext(ViewModeContext);
@@ -257,11 +258,11 @@ export default function Accounts() {
 
     setIsSwitchingAccount(true);
     setSwitchingToId(session.userId);
+    setPendingSwitchUserId(session.userId);
     try {
       const stored = localStorage.getItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH);
       const launchMinimized = stored !== null ? stored === 'true' : true;
       await SwitchAccount(session, launchMinimized);
-      setActiveLoginSession(session);
       setLastSwitchedId(session.userId);
 
       setTimeout(() => {
@@ -270,9 +271,11 @@ export default function Accounts() {
     } catch (error) {
       console.error(error);
       toast.error('Failed to switch account.', { id: 'switch-account-error' });
+      setPendingSwitchUserId(null);
     } finally {
       setSwitchingToId(null);
       setIsSwitchingAccount(false);
+      setTimeout(() => setPendingSwitchUserId((current) => current === session.userId ? null : current), 15000);
     }
   }
 
