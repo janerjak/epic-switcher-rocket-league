@@ -1,4 +1,6 @@
 import { useEffect, useState } from 'react';
+import { useContext } from 'react';
+import { useLocation } from 'react-router-dom';
 import { Minus, Square, Copy, X } from 'lucide-react';
 import styles from './TopBar.module.css';
 import {
@@ -10,12 +12,22 @@ import {
 import { ThemeToggle } from './ThemeToggle';
 import { LayoutToggle } from './LayoutToggle';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
+import { TRN_RL_MODES } from '../lib/trn';
 
 function TopBar({ className }) {
+  const { pathname } = useLocation();
   const [buttonStyle, setButtonStyle] = useState(() => {
     return localStorage.getItem(STORAGE_KEYS.WINDOW_BUTTON_STYLE) || 'windows';
   });
   const [isMaximized, setIsMaximized] = useState(false);
+  const {
+    selectedPlaylist,
+    setSelectedPlaylist,
+    isFetching,
+    remainingCount,
+    refreshRanks,
+  } = useContext(RocketLeagueRankContext);
 
   useEffect(() => {
     const handleSync = () => {
@@ -43,6 +55,36 @@ function TopBar({ className }) {
         <ThemeToggle className={styles.topBtn} />
         <LayoutToggle className={styles.topBtn} />
       </div>
+
+      {pathname === '/accounts' && (
+        <div className={styles.playlistControls} onDoubleClick={(e) => e.stopPropagation()}>
+          <label className={styles.playlistSelectWrap}>
+            <span className={styles.playlistSelectLabel}>Playlist</span>
+            <select
+              className={styles.playlistSelect}
+              value={selectedPlaylist}
+              onChange={(e) => setSelectedPlaylist(e.target.value)}
+              disabled={isFetching}
+            >
+              {TRN_RL_MODES.map((mode) => (
+                <option key={mode.value} value={mode.value}>
+                  {mode.label}
+                </option>
+              ))}
+            </select>
+          </label>
+
+          <button
+            type="button"
+            className={`${styles.playlistFetchButton} ${isFetching ? styles.playlistFetchButtonLoading : ''}`}
+            onClick={refreshRanks}
+            disabled={isFetching}
+          >
+            {isFetching && <span className={styles.playlistSpinner} />}
+            <span>{isFetching ? `${remainingCount} left` : 'Fetch'}</span>
+          </button>
+        </div>
+      )}
 
       {buttonStyle === 'windows' ? (
         <div key="windows" className={styles.winControlsWindows}>

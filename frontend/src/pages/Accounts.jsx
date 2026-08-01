@@ -17,12 +17,8 @@ import { SelectAndSaveAvatar, RemoveAvatar } from "../../wailsjs/go/services/Ava
 import { useAvatarCache } from '../context/AvatarCacheContext';
 import { getBorderThickness } from '../components/modals/CustomizeAvatarModal/avatarUtils';
 import SuccessSprout from '../components/SuccessSprout';
-import {
-  TRN_RL_MODES,
-  extractTrnModeStats,
-  fetchRocketLeagueProfile,
-  getTrnModeLabel,
-} from '../lib/trn';
+import { extractTrnModeStats, getTrnModeLabel } from '../lib/trn';
+import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
 
 export default function Accounts() {
   const location = useLocation();
@@ -48,10 +44,7 @@ export default function Accounts() {
   const [borderThickness, setBorderThickness] = useState(getBorderThickness);
   const [lastSwitchedId, setLastSwitchedId] = useState(null);
   const [switchingToId, setSwitchingToId] = useState(null);
-  const [selectedTrnMode, setSelectedTrnMode] = useState('double');
-  const [trnProfiles, setTrnProfiles] = useState({});
-  const [trnLoading, setTrnLoading] = useState(false);
-  const [trnError, setTrnError] = useState('');
+  const { selectedPlaylist, profiles, lastError } = useContext(RocketLeagueRankContext);
   const { cacheVersion } = useAvatarCache();
 
   useEffect(() => {
@@ -68,89 +61,6 @@ export default function Accounts() {
     window.addEventListener('storage', loadBorder);
     return () => window.removeEventListener('storage', loadBorder);
   }, []);
-
-  useEffect(() => {
-    let cancelled = false;
-
-    async function loadTrnProfiles() {
-      const candidates = sessions
-        .map((session) => ({
-          session,
-          username: session.username || session.alias || '',
-        }))
-        .filter(({ username }) => Boolean(username));
-
-      if (candidates.length === 0) {
-        setTrnProfiles({});
-        setTrnError('');
-        setTrnLoading(false);
-        return;
-      }
-
-      setTrnLoading(true);
-      setTrnError('');
-
-      const results = await Promise.allSettled(
-        candidates.map(async ({ session, username }) => {
-          const profile = await fetchRocketLeagueProfile(username, 'epic');
-
-          console.log('TRN profile fetched', {
-            userId: session.userId,
-            username,
-            mode: selectedTrnMode,
-            profile,
-          });
-
-          return {
-            userId: session.userId,
-            username,
-            profile,
-          };
-        })
-      );
-
-      if (cancelled) return;
-
-      const nextProfiles = {};
-      let failureCount = 0;
-
-      results.forEach((result, index) => {
-        const fallback = candidates[index];
-
-        if (result.status === 'fulfilled') {
-          nextProfiles[result.value.userId] = {
-            username: result.value.username,
-            profile: result.value.profile,
-            error: null,
-          };
-          return;
-        }
-
-        failureCount += 1;
-        console.error('TRN profile fetch failed', {
-          userId: fallback?.session?.userId,
-          username: fallback?.username,
-          error: result.reason,
-        });
-
-        nextProfiles[fallback?.session?.userId] = {
-          username: fallback?.username,
-          profile: null,
-          error: result.reason,
-        };
-      });
-
-      setTrnProfiles(nextProfiles);
-      setTrnError(failureCount > 0 ? `TRN fetch failed for ${failureCount} account(s).` : '');
-      setTrnLoading(false);
-    }
-
-    loadTrnProfiles();
-
-    return () => {
-      cancelled = true;
-    };
-  }, [sessions, selectedTrnMode]);
 
   async function handleAccept() {
     const sessionToSave = { ...newLoginSession, username: newLoginUsername || "" };
@@ -269,8 +179,8 @@ export default function Accounts() {
   const accountsLabel = "Select an account to switch";
 
   function renderRankBadge(session) {
-    const profile = trnProfiles[session.userId]?.profile;
-    const rankInfo = extractTrnModeStats(profile, selectedTrnMode);
+    const profile = profiles[session.userId]?.profile;
+    const rankInfo = extractTrnModeStats(profile, selectedPlaylist);
 
     if (!rankInfo) {
       return null;
@@ -281,14 +191,14 @@ export default function Accounts() {
       .join(' · ');
 
     return (
-      <div className={styles.rankBadge} title={rankInfo.rankName || rankText || 'TRN rank'}>
+      <div className={styles.rankBadge} title={rankInfo.rankName || rankText || 'Playlist rank'}>
         {rankInfo.imageURL ? (
           <img src={rankInfo.imageURL} alt="" className={styles.rankImage} />
         ) : (
           <div className={styles.rankImageFallback}>RL</div>
         )}
         <div className={styles.rankTextBlock}>
-          <div className={styles.rankLabel}>{getTrnModeLabel(selectedTrnMode)}</div>
+          <div className={styles.rankLabel}>{getTrnModeLabel(selectedPlaylist)}</div>
           <div className={styles.rankValue}>{rankText || 'No rank data'}</div>
         </div>
       </div>
@@ -404,45 +314,27 @@ export default function Accounts() {
                       </div>
                     </div>
 
-                    <div className={styles.subtitleControls}>
-                      <label className={styles.modeSelectWrap}>
-                        <span className={styles.modeSelectLabel}>TRN mode</span>
-                        <select
-                          className={styles.modeSelect}
-                          value={selectedTrnMode}
-                          onChange={(e) => setSelectedTrnMode(e.target.value)}
+                    {nonActiveAccountsCount >= 2 && (
+                      <div className={styles.viewToggle}>
+                        <button
+                          className={`${styles.toggleBtn} ${viewMode === 'list' ? styles.activeToggle : ''}`}
+                          onClick={() => setViewMode('list')}
                         >
-                          {TRN_RL_MODES.map((mode) => (
-                            <option key={mode.value} value={mode.value}>
-                              {mode.label}
-                            </option>
-                          ))}
-                        </select>
-                      </label>
-
-                      {nonActiveAccountsCount >= 2 && (
-                        <div className={styles.viewToggle}>
-                          <button
-                            className={`${styles.toggleBtn} ${viewMode === 'list' ? styles.activeToggle : ''}`}
-                            onClick={() => setViewMode('list')}
-                          >
-                            <HiViewList />
-                          </button>
-                          <button
-                            className={`${styles.toggleBtn} ${viewMode === 'grid' ? styles.activeToggle : ''}`}
-                            onClick={() => setViewMode('grid')}
-                          >
-                            <HiViewGrid />
-                          </button>
-                        </div>
-                      )}
-                    </div>
+                          <HiViewList />
+                        </button>
+                        <button
+                          className={`${styles.toggleBtn} ${viewMode === 'grid' ? styles.activeToggle : ''}`}
+                          onClick={() => setViewMode('grid')}
+                        >
+                          <HiViewGrid />
+                        </button>
+                      </div>
+                    )}
                   </div>
 
-                  {(trnLoading || trnError) && (
+                  {lastError && (
                     <div className={styles.trnStatusRow}>
-                      {trnLoading && <span className={styles.trnStatus}>TRN loading profiles...</span>}
-                      {trnError && <span className={styles.trnError}>{trnError}</span>}
+                      <span className={styles.trnError}>{lastError}</span>
                     </div>
                   )}
 

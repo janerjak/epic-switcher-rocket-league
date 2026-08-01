@@ -18,6 +18,86 @@
   margin-top: 2px;
 }
 
+.playlistControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 0 auto;
+  --wails-draggable: no-drag;
+}
+
+.playlistSelectWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  height: 30px;
+  padding: 0 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+}
+
+.playlistSelectLabel {
+  font-size: 0.76rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.playlistSelect {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  outline: none;
+  cursor: pointer;
+}
+
+.playlistFetchButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  min-width: 68px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.playlistFetchButton:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.playlistFetchButtonLoading,
+.playlistFetchButton:disabled {
+  cursor: default;
+  background: #303030;
+  color: #fff;
+  opacity: 1;
+}
+
+.playlistSpinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: playlistSpin 0.7s linear infinite;
+}
+
+@keyframes playlistSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .topBtn {
   margin-left: 0.25rem;
 }
