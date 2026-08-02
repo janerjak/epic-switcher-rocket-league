@@ -2,4 +2,5 @@ build/bin
 node_modules
 frontend/dist
 .vercel
-.env*.local
+**/.env
+**/.env*.local

@@ -3,6 +3,7 @@ import { AuthProvider } from './AuthContext';
 import { SessionProvider } from './SessionContext';
 import { ViewModeProvider } from './ViewModeContext';
 import { AvatarCacheProvider } from './AvatarCacheContext';
+import { RocketLeagueRankProvider } from './RocketLeagueRankContext';
 
 export function AppProviders({ children }) {
   return (
@@ -11,7 +12,9 @@ export function AppProviders({ children }) {
         <SessionProvider>
           <ViewModeProvider>
             <AvatarCacheProvider>
-              {children}
+              <RocketLeagueRankProvider>
+                {children}
+              </RocketLeagueRankProvider>
             </AvatarCacheProvider>
           </ViewModeProvider>
         </SessionProvider>

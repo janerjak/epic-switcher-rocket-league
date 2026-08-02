@@ -18,6 +18,161 @@
   margin-top: 2px;
 }
 
+.playlistControls {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 18px 0 auto;
+  --wails-draggable: no-drag;
+}
+
+.playlistDropdown {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+}
+
+.playlistDropdownButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 180px;
+  height: 30px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+  color: var(--text-primary);
+  font: inherit;
+  cursor: pointer;
+  transition: background-color 0.15s ease, border-color 0.15s ease, box-shadow 0.15s ease;
+}
+
+.playlistDropdownButton:hover {
+  background: var(--bg-card-hover);
+  border-color: color-mix(in srgb, var(--border-subtle) 80%, var(--text-primary) 12%);
+  box-shadow: var(--shadow-card-hover);
+}
+
+.playlistDropdownButtonOpen {
+  background: var(--bg-card-hover);
+}
+
+.playlistDropdownLabel {
+  font-size: 0.74rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.playlistDropdownValue {
+  font-size: 0.82rem;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.playlistDropdownChevron {
+  margin-left: auto;
+  color: var(--text-secondary);
+  transition: transform 0.2s ease;
+}
+
+.playlistDropdownButtonOpen .playlistDropdownChevron {
+  transform: rotate(180deg);
+}
+
+.playlistDropdownMenu {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  min-width: 220px;
+  padding: 6px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 14px;
+  background: rgba(15, 15, 15, 0.96);
+  box-shadow: 0 24px 44px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(12px);
+  z-index: 9999;
+}
+
+.playlistDropdownItem {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 8px 10px;
+  border: none;
+  border-radius: 10px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+  transition: background-color 0.15s ease, color 0.15s ease;
+}
+
+.playlistDropdownItem:hover {
+  background: rgba(255, 255, 255, 0.08);
+}
+
+.playlistDropdownItemActive {
+  background: rgba(255, 255, 255, 0.12);
+}
+
+.playlistDropdownItemLabel {
+  font-size: 0.84rem;
+}
+
+.playlistDropdownItemCheck {
+  color: var(--color-accent-green, #22c55e);
+  font-weight: 700;
+}
+
+.playlistFetchButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  height: 30px;
+  min-width: 68px;
+  padding: 0 12px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  font-size: 0.82rem;
+  cursor: pointer;
+  transition: background-color 0.15s ease, opacity 0.15s ease;
+}
+
+.playlistFetchButton:hover {
+  background: color-mix(in srgb, var(--text-primary) 8%, transparent);
+}
+
+.playlistFetchButtonLoading,
+.playlistFetchButton:disabled {
+  cursor: default;
+  background: #303030;
+  color: #fff;
+  opacity: 1;
+}
+
+.playlistSpinner {
+  width: 13px;
+  height: 13px;
+  border-radius: 50%;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  animation: playlistSpin 0.7s linear infinite;
+}
+
+@keyframes playlistSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
 .topBtn {
   margin-left: 0.25rem;
 }

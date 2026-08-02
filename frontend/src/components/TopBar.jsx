@@ -1,5 +1,7 @@
-import { useEffect, useState } from 'react';
-import { Minus, Square, Copy, X } from 'lucide-react';
+import { useEffect, useRef, useState } from 'react';
+import { useContext } from 'react';
+import { useLocation } from 'react-router-dom';
+import { ChevronDown, Copy, Minus, Square, X } from 'lucide-react';
 import styles from './TopBar.module.css';
 import {
   WindowMinimise,
@@ -10,12 +12,24 @@ import {
 import { ThemeToggle } from './ThemeToggle';
 import { LayoutToggle } from './LayoutToggle';
 import { STORAGE_KEYS } from '../constants/storageKeys';
+import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
+import { RANK_PLAYLISTS } from '../lib/rank';
 
 function TopBar({ className }) {
+  const { pathname } = useLocation();
   const [buttonStyle, setButtonStyle] = useState(() => {
     return localStorage.getItem(STORAGE_KEYS.WINDOW_BUTTON_STYLE) || 'windows';
   });
   const [isMaximized, setIsMaximized] = useState(false);
+  const [isPlaylistOpen, setIsPlaylistOpen] = useState(false);
+  const playlistWrapRef = useRef(null);
+  const {
+    selectedPlaylist,
+    setSelectedPlaylist,
+    isFetching,
+    remainingCount,
+    refreshRanks,
+  } = useContext(RocketLeagueRankContext);
 
   useEffect(() => {
     const handleSync = () => {
@@ -32,6 +46,27 @@ function TopBar({ className }) {
     return () => window.removeEventListener('resize', syncMaximized);
   }, []);
 
+  useEffect(() => {
+    const handlePointerDown = (event) => {
+      if (playlistWrapRef.current && !playlistWrapRef.current.contains(event.target)) {
+        setIsPlaylistOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event) => {
+      if (event.key === 'Escape') {
+        setIsPlaylistOpen(false);
+      }
+    };
+
+    window.addEventListener('pointerdown', handlePointerDown);
+    window.addEventListener('keydown', handleKeyDown);
+    return () => {
+      window.removeEventListener('pointerdown', handlePointerDown);
+      window.removeEventListener('keydown', handleKeyDown);
+    };
+  }, []);
+
   const handleToggleMaximize = () => {
     WindowToggleMaximise();
     setIsMaximized((prev) => !prev);
@@ -43,6 +78,58 @@ function TopBar({ className }) {
         <ThemeToggle className={styles.topBtn} />
         <LayoutToggle className={styles.topBtn} />
       </div>
+
+      {pathname === '/accounts' && (
+        <div className={styles.playlistControls} onDoubleClick={(e) => e.stopPropagation()}>
+          <div className={styles.playlistDropdown} ref={playlistWrapRef}>
+            <button
+              type="button"
+              className={`${styles.playlistDropdownButton} ${isPlaylistOpen ? styles.playlistDropdownButtonOpen : ''}`}
+              onClick={() => setIsPlaylistOpen((current) => !current)}
+              aria-haspopup="menu"
+              aria-expanded={isPlaylistOpen}
+            >
+              <span className={styles.playlistDropdownLabel}>Playlist</span>
+              <span className={styles.playlistDropdownValue}>{RANK_PLAYLISTS.find((mode) => mode.value === selectedPlaylist)?.label || selectedPlaylist}</span>
+              <ChevronDown size={14} className={styles.playlistDropdownChevron} />
+            </button>
+
+            {isPlaylistOpen && (
+              <div className={styles.playlistDropdownMenu} role="menu" aria-label="Playlist selector">
+                {RANK_PLAYLISTS.map((mode) => {
+                  const isActive = selectedPlaylist === mode.value;
+                  return (
+                    <button
+                      key={mode.value}
+                      type="button"
+                      className={`${styles.playlistDropdownItem} ${isActive ? styles.playlistDropdownItemActive : ''}`}
+                      onClick={() => {
+                        setSelectedPlaylist(mode.value);
+                        setIsPlaylistOpen(false);
+                      }}
+                      role="menuitemradio"
+                      aria-checked={isActive}
+                    >
+                      <span className={styles.playlistDropdownItemLabel}>{mode.label}</span>
+                      {isActive && <span className={styles.playlistDropdownItemCheck}>✓</span>}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
+          </div>
+
+          <button
+            type="button"
+            className={`${styles.playlistFetchButton} ${isFetching ? styles.playlistFetchButtonLoading : ''}`}
+            onClick={refreshRanks}
+            disabled={isFetching}
+          >
+            {isFetching && <span className={styles.playlistSpinner} />}
+            <span>{isFetching ? `${remainingCount} left` : 'Fetch'}</span>
+          </button>
+        </div>
+      )}
 
       {buttonStyle === 'windows' ? (
         <div key="windows" className={styles.winControlsWindows}>

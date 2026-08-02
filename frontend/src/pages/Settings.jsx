@@ -53,6 +53,9 @@ function Settings() {
     const stored = localStorage.getItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH);
     return stored !== null ? stored === "true" : true;
   });
+  const [autoSwitchLowestAccount, setAutoSwitchLowestAccount] = useState(() => {
+    return localStorage.getItem(STORAGE_KEYS.AUTO_SWITCH_LOWEST_ACCOUNT) === "true";
+  });
   const [windowButtonStyle, setWindowButtonStyle] = useState(() => {
     return localStorage.getItem(STORAGE_KEYS.WINDOW_BUTTON_STYLE) || "windows";
   });
@@ -90,6 +93,9 @@ function Settings() {
       const storedLauncherMinimized = localStorage.getItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH);
       setLauncherMinimizedOnSwitch(storedLauncherMinimized !== null ? storedLauncherMinimized === "true" : true);
 
+      const storedAutoSwitchLowest = localStorage.getItem(STORAGE_KEYS.AUTO_SWITCH_LOWEST_ACCOUNT);
+      setAutoSwitchLowestAccount(storedAutoSwitchLowest === "true");
+
       setWindowButtonStyle(localStorage.getItem(STORAGE_KEYS.WINDOW_BUTTON_STYLE) || "windows");
     };
 
@@ -112,6 +118,11 @@ function Settings() {
     localStorage.setItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH, launcherMinimizedOnSwitch);
     window.dispatchEvent(new Event("storage"));
   }, [launcherMinimizedOnSwitch]);
+
+  useEffect(() => {
+    localStorage.setItem(STORAGE_KEYS.AUTO_SWITCH_LOWEST_ACCOUNT, autoSwitchLowestAccount);
+    window.dispatchEvent(new Event("storage"));
+  }, [autoSwitchLowestAccount]);
 
   useEffect(() => {
     localStorage.setItem(STORAGE_KEYS.WINDOW_BUTTON_STYLE, windowButtonStyle);
@@ -354,6 +365,24 @@ function Settings() {
                     type="checkbox"
                     checked={launcherMinimizedOnSwitch}
                     onChange={(e) => setLauncherMinimizedOnSwitch(e.target.checked)}
+                  />
+                  <span className={styles.slider}></span>
+                </label>
+              </div>
+
+              <div className={styles.toggleRow}>
+                <div className={styles.toggleLabelGroup}>
+                  <label htmlFor="autoSwitchLowestToggle" className={styles.toggleLabel}>Auto-switch to lowest account</label>
+                  <span className={styles.toggleSubLabel}>
+                    Automatically switch to the account with the lowest cached playlist MMR after ranks are loaded.
+                  </span>
+                </div>
+                <label className={styles.switch}>
+                  <input
+                    id="autoSwitchLowestToggle"
+                    type="checkbox"
+                    checked={autoSwitchLowestAccount}
+                    onChange={(e) => setAutoSwitchLowestAccount(e.target.checked)}
                   />
                   <span className={styles.slider}></span>
                 </label>

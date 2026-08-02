@@ -1,0 +1,13 @@
+{
+  "name": "trn-scraper-service",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "start": "node server.js",
+    "install:browsers": "playwright install chromium firefox"
+  },
+  "dependencies": {
+    "playwright": "^1.57.0"
+  }
+}

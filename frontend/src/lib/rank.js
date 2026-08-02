@@ -1,0 +1,95 @@
+import { GetRocketLeagueRankProfile } from '../../wailsjs/go/services/RocketLeagueRankService';
+
+export const RANK_PLAYLISTS = [
+  { value: 'duel', label: '1v1', aliases: ['duel', '1v1', 'solo', 'solos'] },
+  { value: 'double', label: '2v2', aliases: ['double', 'doubles', '2v2'] },
+  { value: 'standard', label: '3v3', aliases: ['standard', 'trio', 'trios', '3v3'] },
+  { value: 'dropshot', label: 'Dropshot', aliases: ['dropshot'] },
+  { value: 'hoops', label: 'Hoops', aliases: ['hoops'] },
+  { value: 'rumble', label: 'Rumble', aliases: ['rumble'] },
+  { value: 'snowday', label: 'Snowday', aliases: ['snowday'] },
+  { value: 'tournament', label: 'Tournament', aliases: ['tournament'] },
+];
+
+export function getRankModeLabel(mode) {
+  return RANK_PLAYLISTS.find((item) => item.value === mode)?.label || mode;
+}
+
+export function getPlaylistLabel(mode) {
+  return getRankModeLabel(mode);
+}
+
+export async function fetchRocketLeagueRankProfile(username, platform = 'epic') {
+  const raw = await GetRocketLeagueRankProfile(username, platform);
+  return JSON.parse(raw);
+}
+
+function getByPath(object, path) {
+    return path.split(".").reduce((value, key) => (value ? value[key] : undefined), object);
+}
+
+function normalizeRankBlock(block) {
+    if (!block) return null;
+
+    const rank = block.rank || block.seasonRank || {};
+    const tier = rank.tier || block.tier || {};
+    const division = rank.division || block.division || {};
+
+    return {
+        rankName: tier.name || rank.name || block.rankName || null,
+        divisionName: division.name || block.divisionName || null,
+        mmr: block.mmr ?? rank.mmr ?? block.rating ?? block.rankRating ?? null,
+        imageURL: rank.imageURL || block.imageURL || tier.imageURL || null,
+        raw: block,
+    };
+}
+
+function matchesMode(text, mode) {
+    const target = (text || "").toString().toLowerCase();
+    return RANK_PLAYLISTS.find((item) => item.value === mode)?.aliases.some((alias) => target.includes(alias)) || false;
+}
+
+export function extractRankStats(profileResponse, mode) {
+  const root = profileResponse?.data || profileResponse || {};
+
+  const nestedCandidates = [`stats.ranked.${mode}`, `stats.ranked.${mode}s`, `stats.${mode}`, `ranked.${mode}`, `ranked.${mode}s`];
+
+    for (const path of nestedCandidates) {
+        const block = getByPath(root, path);
+        const normalized = normalizeRankBlock(block);
+        if (normalized?.mmr != null || normalized?.imageURL || normalized?.rankName || normalized?.divisionName) {
+            return normalized;
+    }
+  }
+
+  const extraCandidates = [`stats.extra.${mode}`, `stats.extra.${mode}s`, `extra.${mode}`, `extra.${mode}s`];
+
+  for (const path of extraCandidates) {
+    const block = getByPath(root, path);
+    const normalized = normalizeRankBlock(block);
+    if (normalized?.mmr != null || normalized?.imageURL || normalized?.rankName || normalized?.divisionName) {
+      return normalized;
+    }
+  }
+
+    const segments = root.segments || root.stats?.segments || [];
+    const segment = segments.find((item) => {
+        const descriptor = [
+            item?.metadata?.name,
+            item?.metadata?.label,
+            item?.metadata?.title,
+            item?.attributes?.playlist,
+            item?.attributes?.mode,
+            item?.type,
+        ]
+            .filter(Boolean)
+            .join(" ");
+
+        return matchesMode(descriptor, mode);
+    });
+
+    if (!segment) return null;
+
+    const stats = segment.stats || segment.data || segment;
+    return normalizeRankBlock(stats);
+}

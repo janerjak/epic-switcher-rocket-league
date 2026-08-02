@@ -30,7 +30,9 @@ export function AuthProvider({ children }) {
         const isNew = await CheckIfSessionIsNew(currentSession.userId);
         setNewLoginSession(isNew ? currentSession : null);
       } else {
-        setActiveLoginSession(null);
+        if (!isSwitchingAccount) {
+          setActiveLoginSession(null);
+        }
         setIsLoggedIn(false);
         setNewLoginSession(null);
       }
@@ -42,7 +44,9 @@ export function AuthProvider({ children }) {
     } catch (err) {
       console.log("ℹ️ Login detection info:", err);
       setIsLoggedIn(false);
-      setActiveLoginSession(null);
+      if (!isSwitchingAccount) {
+        setActiveLoginSession(null);
+      }
       setNewLoginSession(null);
     }
   }, []);

@@ -68,7 +68,7 @@
 
 /* ---- Active Account Section ---- */
 .activeAccountSection {
-  margin-bottom: 4rem;
+  margin-bottom: 1.5rem;
   display: flex;
   justify-content: center;
 }
@@ -177,6 +177,15 @@
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
+}
+
+.activeRankRow {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 8px;
+  margin-top: 6px;
+  flex-wrap: wrap;
 }
 
 .activeAccountSide {
@@ -365,6 +374,81 @@
   align-items: center;
 }
 
+.subtitleControls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+
+.modeSelectWrap {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 10px;
+  border: 1px solid var(--border-subtle);
+  border-radius: 999px;
+  background: var(--bg-surface);
+}
+
+.modeSelectLabel {
+  font-size: 0.78rem;
+  color: var(--text-secondary);
+  white-space: nowrap;
+}
+
+.modeSelect {
+  border: none;
+  background: transparent;
+  color: var(--text-primary);
+  font: inherit;
+  outline: none;
+}
+
+.fetchStatusRow {
+  display: flex;
+  justify-content: flex-end;
+  margin-top: 8px;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+
+.fetchStatus,
+.fetchError {
+  font-size: 0.8rem;
+  line-height: 1.4;
+}
+
+.fetchStatus {
+  color: var(--text-secondary);
+}
+
+.fetchError {
+  color: #ef4444;
+}
+
+.rankStatusIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  font-size: 1rem;
+  line-height: 1;
+}
+
+.rankStatusError {
+  color: #ef4444;
+}
+
+.rankStatusStale {
+  color: #f59e0b;
+}
+
+.rankStatusMissing {
+  color: var(--text-secondary);
+}
+
 .addIcon {
   font-size: 1rem;
   color: var(--text-secondary);
@@ -434,9 +518,10 @@
 
 /* ---- Container Views ---- */
 .listContainer {
-  max-height: 70vh;
-  overflow-y: auto;
+  max-height: none;
+  overflow: visible;
   padding-top: 2px;
+  padding-bottom: 12px;
 }
 
 .listView {
@@ -471,8 +556,14 @@
   overflow: hidden;
 }
 
+.listItemLowest {
+  border-color: rgba(34, 197, 94, 0.35);
+}
+
 .listItem:hover {
-  border-color: var(--border-subtle);
+  background: var(--bg-card-hover);
+  border-color: color-mix(in srgb, var(--border-subtle) 70%, var(--text-primary) 10%);
+  box-shadow: var(--shadow-card-hover);
 }
 
 
@@ -527,30 +618,6 @@
 }
 
 
-.itemOverlay {
-  position: absolute;
-  inset: 0;
-  background: rgba(0, 0, 0, 0.6);
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  opacity: 0;
-  transition: opacity 0.2s ease;
-  color: white;
-  z-index: 10;
-  font-size: 0.9rem;
-  font-weight: 600;
-  text-align: center;
-  pointer-events: none;
-  backdrop-filter: blur(2px);
-  border-radius: 18px;
-
-}
-
-.listItem:hover .itemOverlay {
-  opacity: 1;
-}
-
 /* ---- Switching state ---- */
 .listItemDisabled {
   pointer-events: none;
@@ -562,38 +629,19 @@
   opacity: 1;
 }
 
-.itemOverlayVisible {
-  opacity: 1;
-}
-
-.switchingSpinner {
-  width: 22px;
-  height: 22px;
-  border-radius: 50%;
-  border: 2px solid rgba(255, 255, 255, 0.35);
-  border-top-color: white;
-  animation: switchingSpin 0.7s linear infinite;
-}
-
-@keyframes switchingSpin {
-  to {
-    transform: rotate(360deg);
-  }
-}
-
 /* ---- Tooltip ---- */
 .tooltip {
   position: absolute;
   top: 50%;
   left: 120%;
   transform: translateY(-50%);
-  padding: 8px 12px;
+  padding: 10px 12px;
   font-size: 0.78rem;
   line-height: 1.4;
-  color: var(--text-primary);
-  background: var(--bg-surface);
-  border: 1px solid var(--border-subtle);
-  border-radius: 6px;
+  color: #f8fafc;
+  background: rgba(15, 23, 42, 0.96);
+  border: 1px solid rgba(148, 163, 184, 0.24);
+  border-radius: 10px;
   white-space: normal;
   text-align: left;
   width: max-content;
@@ -601,7 +649,7 @@
   z-index: 9999;
   margin-left: 4px;
   display: none;
-  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+  box-shadow: 0 18px 40px rgba(0, 0, 0, 0.38);
 }
 
 .tooltipWrapper:hover .tooltip {
@@ -622,6 +670,284 @@
   align-items: center;
   gap: 6px;
   min-width: 0;
+}
+
+.rankBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+  padding: 8px 11px;
+  border-radius: 16px;
+  background: color-mix(in srgb, var(--text-primary) 6%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.accountStatusPanel {
+  display: grid;
+  grid-template-columns: auto minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 10px;
+  width: min(420px, 100%);
+  margin-top: 10px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  text-align: left;
+  box-shadow: var(--shadow-card-hover);
+}
+
+.accountStatusPanelNeutral {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.accountStatusPanelSuccess {
+  color: #dcfce7;
+  background: linear-gradient(135deg, rgba(22, 101, 52, 0.88), rgba(20, 83, 45, 0.74));
+  border: 1px solid rgba(134, 239, 172, 0.32);
+}
+
+.accountStatusPanelWarning {
+  color: #fff7ed;
+  background: linear-gradient(135deg, rgba(146, 64, 14, 0.9), rgba(120, 53, 15, 0.76));
+  border: 1px solid rgba(253, 186, 116, 0.38);
+}
+
+.accountStatusPanelError {
+  color: #fee2e2;
+  background: linear-gradient(135deg, rgba(127, 29, 29, 0.88), rgba(91, 17, 17, 0.74));
+  border: 1px solid rgba(248, 113, 113, 0.34);
+}
+
+.accountStatusPanelStale {
+  color: #ffedd5;
+  background: linear-gradient(135deg, rgba(124, 58, 9, 0.88), rgba(92, 43, 12, 0.74));
+  border: 1px solid rgba(251, 191, 36, 0.3);
+}
+
+.accountStatusPanelMissing {
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--bg-surface) 70%, transparent);
+  border: 1px solid var(--border-subtle);
+}
+
+.accountStatusPanelIcon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 26px;
+  height: 26px;
+  flex-shrink: 0;
+  border-radius: 9px;
+  font-size: 1.1rem;
+  background: rgba(255, 255, 255, 0.14);
+}
+
+.accountStatusPanelText {
+  min-width: 0;
+}
+
+.accountStatusPanelTitle {
+  color: #fff;
+  font-size: 0.82rem;
+  font-weight: 800;
+  line-height: 1.15;
+}
+
+.accountStatusPanelBody {
+  margin-top: 2px;
+  color: rgba(255, 255, 255, 0.82);
+  font-size: 0.74rem;
+  font-weight: 500;
+  line-height: 1.2;
+}
+
+.lowestListBadge {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  padding: 3px 8px;
+  color: #dcfce7;
+  background: rgba(22, 101, 52, 0.82);
+  border: 1px solid rgba(134, 239, 172, 0.28);
+  border-radius: 8px;
+  font-size: 0.68rem;
+  font-weight: 800;
+  letter-spacing: 0.03em;
+  text-transform: uppercase;
+}
+
+.accountStatusButton {
+  align-self: center;
+  height: 28px;
+  padding: 0 12px;
+  color: #431407;
+  background: #fed7aa;
+  border: 1px solid rgba(255, 237, 213, 0.7);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 0.78rem;
+  font-weight: 800;
+  font-family: inherit;
+  transition: background-color 0.15s ease, transform 0.15s ease;
+}
+
+.accountStatusButton:hover {
+  background: #ffedd5;
+}
+
+.accountStatusButton:active {
+  transform: scale(0.98);
+}
+
+.rankImage,
+.rankImageFallback {
+  width: 24px;
+  height: 24px;
+  flex-shrink: 0;
+  border-radius: 50%;
+}
+
+.rankImage {
+  object-fit: cover;
+}
+
+.rankImageFallback {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 0.62rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  background: color-mix(in srgb, var(--text-primary) 12%, transparent);
+}
+
+.rankTextBlock {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
+.rankMMR {
+  font-size: 0.68rem;
+  line-height: 1.1;
+  color: var(--text-secondary);
+  letter-spacing: 0.02em;
+  font-variant-numeric: tabular-nums;
+}
+
+.rankValue {
+  font-size: 0.86rem;
+  line-height: 1.2;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.rowStatusCell {
+  display: flex;
+  justify-content: flex-end;
+  align-items: center;
+  margin-left: auto;
+}
+
+.rowStatusWrap {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: flex-end;
+}
+
+.rowStatusChip {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border-radius: 9px;
+  border: 1px solid var(--border-subtle);
+  background: color-mix(in srgb, var(--bg-surface) 78%, transparent);
+  color: var(--text-secondary);
+  cursor: default;
+}
+
+.rowStatusChipError {
+  color: #f87171;
+  border-color: rgba(248, 113, 113, 0.28);
+}
+
+.rowStatusChipStale {
+  color: #f59e0b;
+  border-color: rgba(245, 158, 11, 0.28);
+}
+
+.rowStatusChipMissing {
+  color: var(--text-secondary);
+}
+
+.rowStatusPopover {
+  position: fixed;
+  min-width: 220px;
+  max-width: 280px;
+  padding: 8px 10px;
+  border-radius: 12px;
+  border: 1px solid var(--border-subtle);
+  background: rgba(15, 15, 15, 0.96);
+  box-shadow: 0 20px 42px rgba(0, 0, 0, 0.38);
+  backdrop-filter: blur(12px);
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(-4px);
+  transition: opacity 0.15s ease, transform 0.15s ease;
+  z-index: 30;
+}
+
+.rowStatusWrap:hover .rowStatusPopover,
+.rowStatusWrap:focus-within .rowStatusPopover {
+  opacity: 1;
+  pointer-events: auto;
+  transform: translateY(0);
+}
+
+.rowStatusPopoverTitle {
+  font-size: 0.76rem;
+  font-weight: 700;
+  color: #fff;
+}
+
+.rowStatusPopoverBody {
+  margin-top: 2px;
+  font-size: 0.72rem;
+  line-height: 1.25;
+  color: rgba(255, 255, 255, 0.82);
+}
+
+.rowStatusPopoverMeta {
+  margin-top: 4px;
+  font-size: 0.7rem;
+  color: rgba(255, 255, 255, 0.55);
+}
+
+.rowStatusPopoverError .rowStatusPopoverTitle,
+.rowStatusPopoverError .rowStatusPopoverBody,
+.rowStatusPopoverError .rowStatusPopoverMeta {
+  color: #fecaca;
+}
+
+.rowStatusPopoverStale .rowStatusPopoverTitle,
+.rowStatusPopoverStale .rowStatusPopoverBody,
+.rowStatusPopoverStale .rowStatusPopoverMeta {
+  color: #fef3c7;
+}
+
+.rowStatusPopoverMissing .rowStatusPopoverTitle,
+.rowStatusPopoverMissing .rowStatusPopoverBody,
+.rowStatusPopoverMissing .rowStatusPopoverMeta {
+  color: rgba(255, 255, 255, 0.82);
 }
 
 .displayName {

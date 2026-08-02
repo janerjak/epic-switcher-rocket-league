@@ -1,22 +1,186 @@
-import { useEffect, useContext, useState } from 'react';
-import { useLocation } from "react-router-dom";
-import PageHeader from '../components/PageHeader';
+import { createPortal } from 'react-dom';
+import { useEffect, useContext, useMemo, useRef, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { AuthContext } from '../context/AuthContext';
 import { SessionContext } from '../context/SessionContext';
 import toast from 'react-hot-toast';
 import { AddDetectedSession, MoveAsideActiveSession } from '../../wailsjs/go/services/AuthService';
 import { LoadSessions } from '../../wailsjs/go/services/SessionStore';
-import { HiOutlineCheckCircle, HiOutlineInformationCircle, HiViewGrid, HiViewList, HiPlus, HiPencil } from 'react-icons/hi';
+import {
+  HiOutlineCheckCircle,
+  HiOutlineExclamationCircle,
+  HiOutlineInformationCircle,
+  HiOutlineXCircle,
+  HiViewGrid,
+  HiViewList,
+  HiPlus,
+  HiPencil,
+} from 'react-icons/hi';
 import styles from './Accounts.module.css';
 import { ViewModeContext } from '../context/ViewModeContext';
-import { SwitchAccount } from "../../wailsjs/go/services/SwitchService";
-import { STORAGE_KEYS } from "../constants/storageKeys";
+import { SwitchAccount } from '../../wailsjs/go/services/SwitchService';
+import { STORAGE_KEYS } from '../constants/storageKeys';
 import CustomizeAvatarModal from '../components/modals/CustomizeAvatarModal';
 import AddAccountModal from '../components/modals/AddAccountModal';
-import { SelectAndSaveAvatar, RemoveAvatar } from "../../wailsjs/go/services/AvatarService";
+import { SelectAndSaveAvatar, RemoveAvatar } from '../../wailsjs/go/services/AvatarService';
 import { useAvatarCache } from '../context/AvatarCacheContext';
 import { getBorderThickness } from '../components/modals/CustomizeAvatarModal/avatarUtils';
 import SuccessSprout from '../components/SuccessSprout';
+import { extractRankStats } from '../lib/rank';
+import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
+
+const RANK_STALE_MS = 5 * 60 * 1000;
+
+function getFirstVisibleChar(str) {
+  if (!str) return '';
+  const segmenter = new Intl.Segmenter('en', { granularity: 'grapheme' });
+  const firstSegment = [...segmenter.segment(str)][0]?.segment || '';
+  const isEmoji = /\p{Emoji}/u.test(firstSegment);
+  return isEmoji ? firstSegment : firstSegment.toUpperCase();
+}
+
+function formatUpdatedLabel(nowTick, fetchedAt) {
+  if (!fetchedAt) return 'Updated a long time ago';
+
+  const parsed = Date.parse(fetchedAt);
+  if (!Number.isFinite(parsed)) return 'Updated a long time ago';
+
+  const diffMs = Math.max(0, nowTick - parsed);
+  const diffMinutes = Math.floor(diffMs / 60000);
+
+  if (diffMinutes < 60) {
+    const label = diffMinutes <= 1 ? '1 minute' : `${diffMinutes} minutes`;
+    return `Updated ${label} ago`;
+  }
+
+  const diffHours = Math.floor(diffMinutes / 60);
+  if (diffHours < 24) {
+    const label = diffHours === 1 ? '1 hour' : `${diffHours} hours`;
+    return `Updated ${label} ago`;
+  }
+
+  return 'Updated a long time ago';
+}
+
+function RowStatusChip({ meta }) {
+  const chipRef = useRef(null);
+  const closeTimerRef = useRef(null);
+  const [isOpen, setIsOpen] = useState(false);
+  const [anchor, setAnchor] = useState({ top: 0, left: 0 });
+
+  const statusKind = meta?.statusKind;
+  const shouldRender = statusKind === 'error' || statusKind === 'stale' || statusKind === 'unranked';
+
+  useEffect(() => {
+    if (!isOpen || !chipRef.current) return;
+
+    const rect = chipRef.current.getBoundingClientRect();
+    const popoverWidth = 280;
+    const left = Math.max(12, Math.min(rect.right + 10, window.innerWidth - popoverWidth - 12));
+    const top = Math.max(12, rect.top - 2);
+    setAnchor({ top, left });
+  }, [isOpen]);
+
+  if (!shouldRender) return null;
+
+  const openPopover = () => {
+    if (closeTimerRef.current) {
+      window.clearTimeout(closeTimerRef.current);
+      closeTimerRef.current = null;
+    }
+    setIsOpen(true);
+  };
+
+  const closePopover = () => {
+    if (closeTimerRef.current) window.clearTimeout(closeTimerRef.current);
+    closeTimerRef.current = window.setTimeout(() => setIsOpen(false), 80);
+  };
+
+  const variant = statusKind === 'stale' ? 'stale' : 'missing';
+  const icon = variant === 'stale' ? <HiOutlineExclamationCircle /> : <HiOutlineInformationCircle />;
+  const title = variant === 'stale' ? 'Cached data is outdated' : 'Unranked account';
+  const body = variant === 'stale'
+    ? 'No ranked data was returned when this account was fetched.'
+    : 'This account currently has no rank data.';
+
+  return (
+    <div className={styles.rowStatusWrap}>
+      <button
+        ref={chipRef}
+        type="button"
+        className={`${styles.rowStatusChip} ${styles[`rowStatusChip${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}
+        aria-label={title}
+        onMouseEnter={openPopover}
+        onMouseLeave={closePopover}
+        onFocus={openPopover}
+        onBlur={closePopover}
+        onClick={(event) => event.stopPropagation()}
+      >
+        {icon}
+      </button>
+
+      {isOpen && createPortal(
+        <div
+          className={`${styles.rowStatusPopover} ${styles[`rowStatusPopover${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}
+          style={{ top: `${anchor.top}px`, left: `${anchor.left}px` }}
+          onMouseEnter={openPopover}
+          onMouseLeave={closePopover}
+        >
+          <div className={styles.rowStatusPopoverTitle}>{title}</div>
+          <div className={styles.rowStatusPopoverBody}>{body}</div>
+          <div className={styles.rowStatusPopoverMeta}>{meta?.updatedLabel || 'Updated a long time ago'}</div>
+        </div>,
+        document.body,
+      )}
+    </div>
+  );
+}
+
+function getRankMeta(session, profiles, selectedPlaylist, nowTick) {
+  const entry = profiles?.[session.userId] || null;
+  const profile = entry?.profile || null;
+  const rankInfo = extractRankStats(profile, selectedPlaylist);
+  const mmrValue = rankInfo?.mmr;
+  const mmr = typeof mmrValue === 'number'
+    ? mmrValue
+    : typeof mmrValue === 'string' && mmrValue.trim() !== ''
+      ? Number(mmrValue)
+      : NaN;
+  const hasMmr = Number.isFinite(mmr);
+
+  const fetchedAt = entry?.fetchedAt ? Date.parse(entry.fetchedAt) : NaN;
+  const isStale = Number.isFinite(fetchedAt) ? nowTick - fetchedAt > RANK_STALE_MS : false;
+  const hasError = Boolean(entry?.error);
+  const hasProfile = Boolean(profile);
+  const isUnranked = Boolean(entry && hasProfile && !hasMmr && !hasError);
+  const isMissing = !entry;
+  const statusKind = hasError
+    ? 'error'
+    : isUnranked
+      ? 'unranked'
+      : isStale
+        ? 'stale'
+        : isMissing
+          ? 'missing'
+          : 'ready';
+  const sortBucket = statusKind === 'ready' ? 0 : 1;
+  const sortValue = hasMmr ? mmr : Number.POSITIVE_INFINITY;
+
+  return {
+    entry,
+    rankInfo,
+    mmr: hasMmr ? mmr : null,
+    hasMmr,
+    updatedLabel: formatUpdatedLabel(nowTick, entry?.fetchedAt),
+    isStale,
+    hasError,
+    isUnranked,
+    isMissing,
+    statusKind,
+    sortBucket,
+    sortValue,
+  };
+}
 
 export default function Accounts() {
   const location = useLocation();
@@ -42,6 +206,16 @@ export default function Accounts() {
   const [borderThickness, setBorderThickness] = useState(getBorderThickness);
   const [lastSwitchedId, setLastSwitchedId] = useState(null);
   const [switchingToId, setSwitchingToId] = useState(null);
+  const autoSwitchAttemptRef = useRef(null);
+  const {
+    selectedPlaylist,
+    nowTick,
+    profiles,
+    lastError,
+    remainingCount,
+    isFetching,
+    isCacheLoaded,
+  } = useContext(RocketLeagueRankContext);
   const { cacheVersion } = useAvatarCache();
 
   useEffect(() => {
@@ -60,25 +234,24 @@ export default function Accounts() {
   }, []);
 
   async function handleAccept() {
-    const sessionToSave = { ...newLoginSession, username: newLoginUsername || "" };
+    const sessionToSave = { ...newLoginSession, username: newLoginUsername || '' };
     await AddDetectedSession(sessionToSave);
     const loaded = await LoadSessions();
     setSessions(loaded || []);
-    toast.success("Account added!", { id: "add-account" });
+    toast.success('Account added!', { id: 'add-account' });
     setNewLoginSession(null);
   }
 
   async function handleAddMainAction() {
     try {
       await MoveAsideActiveSession();
-      toast.success("Epic Games Launcher restarted — log in with your other account.", { id: "move-aside-active-session" });
+      toast.success('Epic Games Launcher restarted - log in with your other account.', { id: 'move-aside-active-session' });
       setShowAddModal(false);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to move aside active session.", { id: "move-aside-error" });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to move aside active session.', { id: 'move-aside-error' });
     }
   }
-
 
   async function handleSwitchAccount(session) {
     if (isSwitchingAccount) return;
@@ -89,17 +262,15 @@ export default function Accounts() {
       const stored = localStorage.getItem(STORAGE_KEYS.LAUNCHER_MINIMIZED_ON_SWITCH);
       const launchMinimized = stored !== null ? stored === 'true' : true;
       await SwitchAccount(session, launchMinimized);
-      // toast.success(`Switched to account: ${session.alias || session.username || session.userId}`, { id: "switch-account" });
       setActiveLoginSession(session);
       setLastSwitchedId(session.userId);
 
-      // Reset after animation
       setTimeout(() => {
         setLastSwitchedId(null);
       }, 2500);
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to switch account.", { id: "switch-account-error" });
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to switch account.', { id: 'switch-account-error' });
     } finally {
       setSwitchingToId(null);
       setIsSwitchingAccount(false);
@@ -115,17 +286,14 @@ export default function Accounts() {
     try {
       const filename = await SelectAndSaveAvatar(activeSession.userId);
       if (filename) {
-        // Update local state immediately
-        setSessions(prev => prev.map(s =>
-          s.userId === activeSession.userId ? { ...s, avatarImage: filename } : s
-        ));
-        toast.success("Avatar updated!", { id: "avatar-success" });
+        setSessions((prev) => prev.map((session) => (
+          session.userId === activeSession.userId ? { ...session, avatarImage: filename } : session
+        )));
+        toast.success('Avatar updated!', { id: 'avatar-success' });
       }
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to update avatar.", { id: "avatar-error" });
-    } finally {
-      // Modal remains open as requested
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to update avatar.', { id: 'avatar-error' });
     }
   }
 
@@ -133,51 +301,231 @@ export default function Accounts() {
     if (!activeSession) return;
     try {
       await RemoveAvatar(activeSession.userId);
-      // Update local state immediately
-      setSessions(prev => prev.map(s =>
-        s.userId === activeSession.userId ? { ...s, avatarImage: "" } : s
-      ));
-      // toast.success("Avatar cleared!", { id: "avatar-success" });
-    } catch (err) {
-      console.error(err);
-      toast.error("Failed to clear avatar.", { id: "avatar-error" });
-    } finally {
-      // Modal remains open as requested
+      setSessions((prev) => prev.map((session) => (
+        session.userId === activeSession.userId ? { ...session, avatarImage: '' } : session
+      )));
+    } catch (error) {
+      console.error(error);
+      toast.error('Failed to clear avatar.', { id: 'avatar-error' });
     }
-  }
-
-  function getFirstVisibleChar(str) {
-    if (!str) return "";
-    const segmenter = new Intl.Segmenter("en", { granularity: "grapheme" });
-    const firstSegment = [...segmenter.segment(str)][0]?.segment || "";
-    const isEmoji = /\p{Emoji}/u.test(firstSegment);
-    return isEmoji ? firstSegment : firstSegment.toUpperCase();
   }
 
   const activeUserId = activeLoginSession?.userId || null;
 
-  // Merge activeLoginSession with session data to get username/alias
   let activeSession = activeUserId
-    ? sessions.find(s => s.userId === activeUserId) || activeLoginSession
+    ? sessions.find((session) => session.userId === activeUserId) || activeLoginSession
     : null;
 
-  // Check if the currently active session is the new detected session
   const isNewSession = newLoginSession && activeLoginSession && newLoginSession.userId === activeLoginSession.userId;
 
-  console.log("Active Session:", activeSession);
-
-  // If it's a new session, merge the username from newLoginUsername
   if (isNewSession && activeSession) {
     activeSession = { ...activeSession, username: newLoginUsername || activeSession.username };
   }
 
-  // Calculate non-active accounts count and label
-  const nonActiveAccountsCount = sessions.filter(s => s.userId !== activeUserId).length;
-  const accountsLabel = "Select an account to switch";
+  const rankedSessions = useMemo(() => {
+    return sessions
+      .map((session) => {
+        const displayName = session.alias || session.username || session.userId;
+        const rankMeta = getRankMeta(session, profiles, selectedPlaylist, nowTick);
+
+        return {
+          session,
+          displayName,
+          ...rankMeta,
+        };
+      })
+      .sort((left, right) => {
+        if (left.sortBucket !== right.sortBucket) return left.sortBucket - right.sortBucket;
+        if (left.sortValue !== right.sortValue) return left.sortValue - right.sortValue;
+        return left.displayName.localeCompare(right.displayName);
+      });
+  }, [nowTick, profiles, selectedPlaylist, sessions]);
+
+  const activeRankMeta = activeSession ? getRankMeta(activeSession, profiles, selectedPlaylist, nowTick) : null;
+  const lowestRankedSession = rankedSessions.find((item) => Number.isFinite(item.sortValue)) || null;
+  const nonActiveRankedSessions = rankedSessions.filter((item) => item.session.userId !== activeUserId);
+  const lowerRankedSession = nonActiveRankedSessions.find((item) => {
+    if (!Number.isFinite(item.sortValue)) return false;
+    if (!activeRankMeta || !Number.isFinite(activeRankMeta.sortValue)) return true;
+    return item.sortValue < activeRankMeta.sortValue;
+  }) || null;
+  const isCurrentLowestAccount = Boolean(
+    activeSession
+    && Number.isFinite(activeRankMeta?.sortValue)
+    && !lowerRankedSession
+  );
+  const nonActiveAccountsCount = sessions.filter((session) => session.userId !== activeUserId).length;
+  const accountsLabel = 'Select an account to switch';
+
+  function renderActiveStatusPanel({ meta, lowerSession = null, isCurrentLowest = false }) {
+    const hasLowerSession = Boolean(lowerSession);
+    const isUnranked = meta?.statusKind === 'unranked';
+    if (!hasLowerSession && !isCurrentLowest && !isUnranked && !meta?.hasError && !meta?.isStale && !meta?.isMissing) {
+      return null;
+    }
+
+    const variant = meta?.isMissing || isUnranked
+      ? 'missing'
+      : hasLowerSession
+        ? 'warning'
+        : isCurrentLowest
+          ? 'success'
+          : meta?.hasError
+            ? 'error'
+            : meta?.isStale
+              ? 'stale'
+              : 'neutral';
+
+    const icon = variant === 'success'
+      ? <HiOutlineCheckCircle />
+      : variant === 'warning'
+        ? <HiOutlineExclamationCircle />
+        : variant === 'error'
+          ? <HiOutlineXCircle />
+          : variant === 'stale'
+            ? <HiOutlineExclamationCircle />
+            : <HiOutlineInformationCircle />;
+
+    const title = meta?.isMissing || isUnranked
+      ? 'No rank data available'
+      : hasLowerSession
+      ? 'Lower account available:'
+      : isCurrentLowest
+        ? 'You are on the lowest account'
+        : isUnranked
+          ? 'Unranked account'
+        : meta?.hasError
+          ? 'Rank fetch failed'
+          : meta?.isStale
+            ? 'Cached data is outdated'
+            : meta?.isMissing
+              ? 'No cached rank yet'
+              : 'Rank data available';
+
+    const body = meta?.isMissing || isUnranked
+      ? activeSession?.alias || activeSession?.username || activeSession?.userId || ''
+      : hasLowerSession
+      ? lowerSession.displayName
+      : activeSession?.alias || activeSession?.username || activeSession?.userId || '';
+
+    return (
+      <div className={`${styles.accountStatusPanel} ${styles[`accountStatusPanel${variant.charAt(0).toUpperCase()}${variant.slice(1)}`] || ''}`}>
+        <div className={styles.accountStatusPanelIcon}>{icon}</div>
+        <div className={styles.accountStatusPanelText}>
+          <div className={styles.accountStatusPanelTitle}>{title}</div>
+          <div className={styles.accountStatusPanelBody}>{body}</div>
+        </div>
+        {hasLowerSession && (
+          <button
+            type="button"
+            className={styles.accountStatusButton}
+            onClick={(event) => {
+              event.stopPropagation();
+              handleSwitchAccount(lowerSession.session);
+            }}
+          >
+            Switch
+          </button>
+        )}
+      </div>
+    );
+  }
+
+  useEffect(() => {
+    const shouldAutoSwitch = localStorage.getItem(STORAGE_KEYS.AUTO_SWITCH_LOWEST_ACCOUNT) === 'true';
+
+    if (!shouldAutoSwitch) {
+      autoSwitchAttemptRef.current = null;
+      return;
+    }
+
+    if (!isCacheLoaded || isLoading || isSwitchingAccount || switchingToId || !lowerRankedSession || !activeSession) {
+      return;
+    }
+
+    if (activeUserId === lowerRankedSession.session.userId) {
+      autoSwitchAttemptRef.current = null;
+      return;
+    }
+
+    const attemptKey = `${activeUserId || 'none'}:${lowerRankedSession.session.userId}`;
+    if (autoSwitchAttemptRef.current === attemptKey) {
+      return;
+    }
+
+    autoSwitchAttemptRef.current = attemptKey;
+    handleSwitchAccount(lowerRankedSession.session);
+  }, [activeSession, activeUserId, isCacheLoaded, isLoading, isSwitchingAccount, lowerRankedSession, switchingToId]);
+
+  function renderRankBadge(rankMeta) {
+    if (!rankMeta?.rankInfo) {
+      return null;
+    }
+
+    const rankText = [
+      rankMeta.rankInfo.rankName,
+      rankMeta.rankInfo.divisionName,
+    ]
+      .filter(Boolean)
+      .join(' · ');
+
+    return (
+      <div className={styles.rankBadge} title={rankMeta.rankInfo.rankName || rankText || 'Playlist rank'}>
+        {rankMeta.rankInfo.imageURL ? (
+          <img src={rankMeta.rankInfo.imageURL} alt="" className={styles.rankImage} />
+        ) : (
+          <div className={styles.rankImageFallback}>RL</div>
+        )}
+        <div className={styles.rankTextBlock}>
+          {rankMeta.mmr != null && (
+            <div className={styles.rankMMR}>{`${Math.round(rankMeta.mmr)} MMR`}</div>
+          )}
+          <div className={styles.rankValue}>{rankText || 'No rank data'}</div>
+        </div>
+      </div>
+    );
+  }
+
+  function renderRankStatus(rankMeta) {
+    if (rankMeta?.hasError) {
+      return (
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusError}`} title={rankMeta.entry?.error || 'Rank fetch failed'}>
+          <HiOutlineXCircle />
+        </span>
+      );
+    }
+
+    if (rankMeta?.isUnranked) {
+      return (
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusMissing}`} title="Unranked account">
+          <HiOutlineInformationCircle />
+        </span>
+      );
+    }
+
+    if (rankMeta?.isStale) {
+      return (
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusStale}`} title="Cached rank data is stale. Click Fetch to refresh.">
+          <HiOutlineExclamationCircle />
+        </span>
+      );
+    }
+
+    if (rankMeta?.isMissing) {
+      return (
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusMissing}`} title="No cached rank data yet.">
+          <HiOutlineInformationCircle />
+        </span>
+      );
+    }
+
+    return null;
+  }
+
+  const activeLowerSession = activeSession && activeRankMeta && lowerRankedSession ? lowerRankedSession : null;
 
   return (
     <div className={styles.pageWrapper}>
-
       {!isLoading && (
         <>
           {sessions.length === 0 && !activeLoginSession ? (
@@ -188,7 +536,6 @@ export default function Accounts() {
             </div>
           ) : (
             <>
-              {/* Not Logged In Section */}
               {!activeSession && (
                 <div className={styles.notLoggedInSection}>
                   <div className={styles.notLoggedInCard}>
@@ -204,7 +551,6 @@ export default function Accounts() {
                 </div>
               )}
 
-              {/* Active Account Section */}
               {activeSession && (
                 <div className={styles.activeAccountSection}>
                   <div className={styles.activeAccountContent}>
@@ -214,7 +560,7 @@ export default function Accounts() {
                           className={`${styles.activeAccountAvatar} ${!showBorder ? styles.activeAccountAvatarNoBorder : ''}`}
                           style={{
                             background: activeSession.avatarColor || undefined,
-                            padding: showBorder ? `${borderThickness}px` : undefined
+                            padding: showBorder ? `${borderThickness}px` : undefined,
                           }}
                         >
                           {activeSession.avatarImage ? (
@@ -224,16 +570,14 @@ export default function Accounts() {
                               className={styles.customAvatarImage}
                             />
                           ) : (
-                            getFirstVisibleChar(
-                              activeSession.alias || activeSession.username || activeSession.userId
-                            )
+                            getFirstVisibleChar(activeSession.alias || activeSession.username || activeSession.userId)
                           )}
                           <div className={styles.avatarOverlay}>
                             <HiPencil />
                           </div>
                         </div>
 
-                        <div className={styles.activeAccountBadge} onClick={(e) => e.stopPropagation()}>
+                        <div className={styles.activeAccountBadge} onClick={(event) => event.stopPropagation()}>
                           <HiOutlineCheckCircle />
                           <span>Currently logged in</span>
                         </div>
@@ -245,11 +589,22 @@ export default function Accounts() {
                           {lastSwitchedId === activeSession.userId && <SuccessSprout key={activeSession.userId} />}
                         </div>
 
+                        <div className={styles.activeRankRow}>
+                          {renderRankBadge(activeRankMeta)}
+                          {renderRankStatus(activeRankMeta)}
+                        </div>
+
+                        {renderActiveStatusPanel({
+                          meta: activeRankMeta,
+                          lowerSession: activeLowerSession,
+                          isCurrentLowest: Boolean(isCurrentLowestAccount),
+                        })}
+
                         {isNewSession && (
                           <button
                             className={styles.addDetectedButton}
-                            onClick={(e) => {
-                              e.stopPropagation();
+                            onClick={(event) => {
+                              event.stopPropagation();
                               handleAccept();
                             }}
                           >
@@ -260,13 +615,11 @@ export default function Accounts() {
                       </div>
                     </div>
 
-                    <div className={styles.activeAccountSide}>
-                    </div>
+                    <div className={styles.activeAccountSide} />
                   </div>
                 </div>
               )}
 
-              {/* Non-Active Accounts List */}
               {nonActiveAccountsCount > 0 && (
                 <>
                   <div className={styles.subtitleRow}>
@@ -280,82 +633,91 @@ export default function Accounts() {
                       </div>
                     </div>
 
-                    {nonActiveAccountsCount >= 2 && (
-                      <div className={styles.viewToggle}>
-                        <button
-                          className={`${styles.toggleBtn} ${viewMode === 'list' ? styles.activeToggle : ''}`}
-                          onClick={() => setViewMode('list')}
-                        >
-                          <HiViewList />
-                        </button>
-                        <button
-                          className={`${styles.toggleBtn} ${viewMode === 'grid' ? styles.activeToggle : ''}`}
-                          onClick={() => setViewMode('grid')}
-                        >
-                          <HiViewGrid />
-                        </button>
-                      </div>
-                    )}
+                    <div className={styles.subtitleControls}>
+                      {(isFetching || lastError) && (
+                        <div className={styles.fetchStatusRow}>
+                          {isFetching && (
+                            <span className={styles.fetchStatus}>
+                              Refreshing {remainingCount} account{remainingCount === 1 ? '' : 's'}...
+                            </span>
+                          )}
+                          {lastError && <span className={styles.fetchError}>{lastError}</span>}
+                        </div>
+                      )}
+
+                      {nonActiveAccountsCount >= 2 && (
+                        <div className={styles.viewToggle}>
+                          <button
+                            className={`${styles.toggleBtn} ${viewMode === 'list' ? styles.activeToggle : ''}`}
+                            onClick={() => setViewMode('list')}
+                          >
+                            <HiViewList />
+                          </button>
+                          <button
+                            className={`${styles.toggleBtn} ${viewMode === 'grid' ? styles.activeToggle : ''}`}
+                            onClick={() => setViewMode('grid')}
+                          >
+                            <HiViewGrid />
+                          </button>
+                        </div>
+                      )}
+                    </div>
                   </div>
 
-                  <div
-                    className={`${styles.listContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}
-                  >
-                    {sessions
-                      .filter(s => s.userId !== activeUserId)
-                      .map((session) => {
-                        const displayName = session.alias || session.username || session.userId;
-                        const isSwitchingToThis = switchingToId === session.userId;
+                  <div className={`${styles.listContainer} ${viewMode === 'grid' ? styles.gridView : styles.listView}`}>
+                    {nonActiveRankedSessions.map((item) => {
+                      const session = item.session;
+                      const displayName = item.displayName;
+                      const isSwitchingToThis = switchingToId === session.userId;
+                      const isLowest = lowestRankedSession?.session.userId === session.userId;
 
-                        return (
-                          <div
-                            key={session.userId}
-                            className={`${styles.listItem} ${isSwitchingAccount ? styles.listItemDisabled : ''} ${isSwitchingToThis ? styles.listItemSwitching : ''}`}
-                            onClick={() => handleSwitchAccount(session)}
-                            aria-disabled={isSwitchingAccount}
-                          >
-                            <div className={styles.avatarWrapper}>
-                              <div
-                                className={`${styles.avatar} ${!showBorder ? styles.avatarNoBorder : ''}`}
-                                style={{
-                                  background: session.avatarColor || undefined,
-                                  padding: showBorder ? '2px' : 0
-                                }}
-                              >
-                                {session.avatarImage ? (
-                                  <img
-                                    src={`/avatar-thumb/${session.avatarImage}?v=${cacheVersion}`}
-                                    alt=""
-                                    className={styles.customAvatarImage}
-                                  />
-                                ) : (
-                                  getFirstVisibleChar(displayName)
-                                )}
-                              </div>
-                            </div>
-
-                            <div className={styles.textBlock}>
-                              <div className={styles.inlineRow}>
-                                <div className={styles.displayName}>{displayName}</div>
-                              </div>
-                            </div>
-
-                            <div className={`${styles.itemOverlay} ${isSwitchingToThis ? styles.itemOverlayVisible : ''}`}>
-                              {isSwitchingToThis ? (
-                                <span className={styles.switchingSpinner} />
+                      return (
+                        <div
+                          key={session.userId}
+                          className={`${styles.listItem} ${isSwitchingAccount ? styles.listItemDisabled : ''} ${isSwitchingToThis ? styles.listItemSwitching : ''} ${isLowest ? styles.listItemLowest : ''}`}
+                          onClick={() => handleSwitchAccount(session)}
+                          aria-disabled={isSwitchingAccount}
+                        >
+                          <div className={styles.avatarWrapper}>
+                            <div
+                              className={`${styles.avatar} ${!showBorder ? styles.avatarNoBorder : ''}`}
+                              style={{
+                                background: session.avatarColor || undefined,
+                                padding: showBorder ? '2px' : 0,
+                              }}
+                            >
+                              {session.avatarImage ? (
+                                <img
+                                  src={`/avatar-thumb/${session.avatarImage}?v=${cacheVersion}`}
+                                  alt=""
+                                  className={styles.customAvatarImage}
+                                />
                               ) : (
-                                <span>click to switch</span>
+                                getFirstVisibleChar(displayName)
                               )}
                             </div>
                           </div>
-                        );
-                      })}
+
+                          <div className={styles.textBlock}>
+                            <div className={styles.inlineRow}>
+                              <div className={styles.displayName}>{displayName}</div>
+                              {isLowest && <div className={styles.lowestListBadge}>Lowest</div>}
+                            </div>
+                            <div className={styles.inlineRow}>
+                              {renderRankBadge(item)}
+                            </div>
+                          </div>
+                          <div className={styles.rowStatusCell}>
+                            <RowStatusChip meta={item} />
+                          </div>
+                        </div>
+                      );
+                    })}
                   </div>
                 </>
               )}
 
-              {/* Only Active Account, No Others */}
-              {sessions.length > 0 && sessions.filter(s => s.userId !== activeUserId).length === 0 && (
+              {sessions.length > 0 && sessions.filter((session) => session.userId !== activeUserId).length === 0 && (
                 <div className={styles.noOtherAccountsMessage}>
                   <div className={styles.noOtherAccountsText}>
                     You haven't added any other accounts yet.
@@ -372,44 +734,37 @@ export default function Accounts() {
             </>
           )}
         </>
-      )
-      }
+      )}
 
+      {showAvatarModal && (
+        <CustomizeAvatarModal
+          username={activeSession?.alias || activeSession?.username || activeSession?.userId}
+          userId={activeSession?.userId}
+          currentAvatarImage={activeSession?.avatarImage}
+          currentAvatarColor={activeSession?.avatarColor}
+          isLocked={isNewSession}
+          onSelect={handleAvatarSelect}
+          onRemove={handleAvatarRemove}
+          onCancel={() => setShowAvatarModal(false)}
+          onAvatarChange={(filename) => {
+            setSessions((prev) => prev.map((session) => (
+              session.userId === activeSession?.userId ? { ...session, avatarImage: filename } : session
+            )));
+          }}
+          onColorChange={(color) => {
+            setSessions((prev) => prev.map((session) => (
+              session.userId === activeSession?.userId ? { ...session, avatarColor: color } : session
+            )));
+          }}
+        />
+      )}
 
-      {
-        showAvatarModal && (
-          <CustomizeAvatarModal
-            username={activeSession?.alias || activeSession?.username || activeSession?.userId}
-            userId={activeSession?.userId}
-            currentAvatarImage={activeSession?.avatarImage}
-            currentAvatarColor={activeSession?.avatarColor}
-            isLocked={isNewSession}
-            onSelect={handleAvatarSelect}
-            onRemove={handleAvatarRemove}
-            onCancel={() => setShowAvatarModal(false)}
-            onAvatarChange={(filename) => {
-              setSessions(prev => prev.map(s =>
-                s.userId === activeSession?.userId ? { ...s, avatarImage: filename } : s
-              ));
-              // setShowAvatarModal(false); // Do not close automatically
-            }}
-            onColorChange={(color) => {
-              setSessions(prev => prev.map(s =>
-                s.userId === activeSession?.userId ? { ...s, avatarColor: color } : s
-              ));
-            }}
-          />
-        )
-      }
-
-      {
-        showAddModal && (
-          <AddAccountModal
-            onMoveAside={handleAddMainAction}
-            onCancel={() => setShowAddModal(false)}
-          />
-        )
-      }
-    </div >
+      {showAddModal && (
+        <AddAccountModal
+          onMoveAside={handleAddMainAction}
+          onCancel={() => setShowAddModal(false)}
+        />
+      )}
+    </div>
   );
 }
