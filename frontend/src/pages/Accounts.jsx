@@ -96,12 +96,12 @@ function RowStatusChip({ meta }) {
     closeTimerRef.current = window.setTimeout(() => setIsOpen(false), 80);
   };
 
-  const variant = statusKind === 'error' || statusKind === 'unranked' ? 'error' : 'stale';
-  const icon = variant === 'error' ? <HiOutlineXCircle /> : <HiOutlineExclamationCircle />;
-  const title = variant === 'error' ? 'Unranked account' : 'Cached data is outdated';
-  const body = variant === 'error'
+  const variant = statusKind === 'stale' ? 'stale' : 'missing';
+  const icon = variant === 'stale' ? <HiOutlineExclamationCircle /> : <HiOutlineInformationCircle />;
+  const title = variant === 'stale' ? 'Cached data is outdated' : 'Unranked account';
+  const body = variant === 'stale'
     ? 'No ranked data was returned when this account was fetched.'
-    : 'Refresh to load newer cached data.';
+    : 'This account currently has no rank data.';
 
   return (
     <div className={styles.rowStatusWrap}>
@@ -364,20 +364,16 @@ export default function Accounts() {
       return null;
     }
 
-    const variant = meta?.isMissing
+    const variant = meta?.isMissing || isUnranked
       ? 'missing'
       : hasLowerSession
-      ? 'warning'
-      : isCurrentLowest
-        ? 'success'
-        : isUnranked
-          ? 'error'
-        : meta?.hasError
-          ? 'error'
-          : meta?.isStale
-            ? 'stale'
-            : meta?.isMissing
-              ? 'missing'
+        ? 'warning'
+        : isCurrentLowest
+          ? 'success'
+          : meta?.hasError
+            ? 'error'
+            : meta?.isStale
+              ? 'stale'
               : 'neutral';
 
     const icon = variant === 'success'
@@ -390,7 +386,7 @@ export default function Accounts() {
             ? <HiOutlineExclamationCircle />
             : <HiOutlineInformationCircle />;
 
-    const title = meta?.isMissing
+    const title = meta?.isMissing || isUnranked
       ? 'No rank data available'
       : hasLowerSession
       ? 'Lower account available:'
@@ -406,7 +402,7 @@ export default function Accounts() {
               ? 'No cached rank yet'
               : 'Rank data available';
 
-    const body = meta?.isMissing
+    const body = meta?.isMissing || isUnranked
       ? activeSession?.alias || activeSession?.username || activeSession?.userId || ''
       : hasLowerSession
       ? lowerSession.displayName
@@ -491,10 +487,18 @@ export default function Accounts() {
   }
 
   function renderRankStatus(rankMeta) {
-    if (rankMeta?.hasError || rankMeta?.isUnranked) {
+    if (rankMeta?.hasError) {
       return (
-        <span className={`${styles.rankStatusIcon} ${styles.rankStatusError}`} title={rankMeta?.isUnranked ? 'Unranked account' : (rankMeta.entry?.error || 'Rank fetch failed')}>
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusError}`} title={rankMeta.entry?.error || 'Rank fetch failed'}>
           <HiOutlineXCircle />
+        </span>
+      );
+    }
+
+    if (rankMeta?.isUnranked) {
+      return (
+        <span className={`${styles.rankStatusIcon} ${styles.rankStatusMissing}`} title="Unranked account">
+          <HiOutlineInformationCircle />
         </span>
       );
     }

@@ -54,8 +54,8 @@ function getFetchPriority(entry, username, playlist) {
   if (entry.error) return 'error';
 
   const playlistStats = extractRankStats(entry.profile, playlist);
-  if (!playlistStats?.mmr) return 'error';
   if (isCacheEntryStale(entry)) return 'stale';
+  if (!playlistStats?.mmr) return 'unranked';
 
   return 'ready';
 }
@@ -138,13 +138,13 @@ export function RocketLeagueRankProvider({ children }) {
       return { session, username, entry, priority };
     });
 
-    const errorTargets = prioritized.filter((item) => item.priority === 'error');
     const staleTargets = prioritized.filter((item) => item.priority === 'stale');
+    const errorTargets = prioritized.filter((item) => item.priority === 'error');
     const readyTargets = prioritized.filter((item) => item.priority === 'ready');
-    const targets = errorTargets.length > 0
-      ? errorTargets
-      : staleTargets.length > 0
-        ? staleTargets
+    const targets = staleTargets.length > 0
+      ? staleTargets
+      : errorTargets.length > 0
+        ? errorTargets
         : readyTargets.length > 0
           ? readyTargets
           : candidates;
