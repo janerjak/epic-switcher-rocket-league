@@ -4,3 +4,4 @@ frontend/dist
 .vercel
 **/.env
 **/.env*.local
+**/settings.json

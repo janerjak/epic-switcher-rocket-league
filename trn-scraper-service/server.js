@@ -2,42 +2,18 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, firefox } from "playwright";
+import {} from "./utils.js";
 
-async function loadEnvFile(filePath) {
-    try {
-        const text = await fs.readFile(filePath, "utf8");
-        for (const rawLine of text.split(/\r?\n/)) {
-            const line = rawLine.trim();
-            if (!line || line.startsWith("#")) continue;
+Array.prototype.randomElement = function () {
+    return this[Math.floor(Math.random() * this.length)];
+};
 
-            const cleaned = line.startsWith("export ") ? line.slice(7).trim() : line;
-            const eqIndex = cleaned.indexOf("=");
-            if (eqIndex === -1) continue;
-
-            const key = cleaned.slice(0, eqIndex).trim();
-            let value = cleaned.slice(eqIndex + 1).trim();
-            value = value.replace(/^['\"]|['\"]$/g, "");
-
-            if (key && process.env[key] === undefined) {
-                process.env[key] = value;
-            }
-        }
-    } catch {
-        // Optional env file.
-    }
-}
-
-await loadEnvFile(".env");
-await loadEnvFile(".env.local");
-
-const PORT = Number(process.env.PORT || 7331);
 const PROFILE_BASE_URL = "https://rocketleague.tracker.network/rocket-league/profile";
-const BROWSER = (process.env.TRN_BROWSER || "chromium").toLowerCase();
-const DEBUG = process.env.TRN_DEBUG === "1";
-const HEADLESS = process.env.TRN_HEADFUL === "1" ? false : true;
+const PORT = Number(process.env.PORT || 7331);
+const BROWSER = (process.env.PLAYWRIGHT_BROWSER || "firefox").toLowerCase();
 const DEBUG_DIR = path.resolve("debug");
 
-const PLAYLISTS = {
+const ROCKET_LEAGUE_PLAYLISTS = {
     10: { group: "ranked", key: "duel" },
     11: { group: "ranked", key: "double" },
     13: { group: "ranked", key: "standard" },
@@ -51,17 +27,20 @@ let browserPromise;
 
 function getBrowser() {
     if (!browserPromise) {
-        const browserType = BROWSER === "firefox" ? firefox : chromium;
-        browserPromise = browserType.launch({
-            headless: HEADLESS,
-            slowMo: Number(process.env.TRN_SLOWMO || 0),
+        const playwrightBrowser = {
+            firefox: firefox,
+            chromium: chromium,
+        }[BROWSER];
+        browserPromise = playwrightBrowser.launch({
+            headless: Boolean(process.env.HEADLESS || true),
+            slowMo: Number(process.env.SCRAPING_SLOWMO || 0),
         });
     }
     return browserPromise;
 }
 
 async function writeDebugFiles(page, username, stage) {
-    if (!DEBUG) return;
+    if (!SCRAPING_DEBUG) return;
 
     await fs.mkdir(DEBUG_DIR, { recursive: true });
     const safeUsername = username.replace(/[^a-z0-9_-]/gi, "_");
@@ -82,7 +61,7 @@ function sendJson(response, status, payload) {
 
 function parseRating(value) {
     if (!value) return null;
-    const match = value.replace(/,/g, "").match(/\b\d{2,5}\b/);
+    const match = value.replace(/,/g, "").match(/\b\d{1,4}\b/);
     return match ? Number(match[0]) : null;
 }
 
@@ -92,7 +71,7 @@ function parseDivision(value) {
 }
 
 function normalizeRow(row) {
-    const playlist = PLAYLISTS[row.playlistId];
+    const playlist = ROCKET_LEAGUE_PLAYLISTS[row.playlistId];
     if (!playlist) return null;
 
     const rating = parseRating(row.ratingText);
@@ -136,7 +115,11 @@ async function scrapeProfile(platform, username) {
     const browser = await getBrowser();
     const context = await browser.newContext({
         locale: "en-US",
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        userAgent: [
+            "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            "AppleWebKit/537.36 (KHTML, like Gecko)",
+            "Chrome/121.0.0.0 Safari/537.36",
+        ].randomElement(),
         viewport: { width: 1366, height: 900 },
     });
     const page = await context.newPage();
@@ -263,8 +246,23 @@ const server = http.createServer(async (request, response) => {
     }
 });
 
-await loadEnvFile(".env");
-await loadEnvFile(".env.local");
+async function loadSettingsFile(filePath, exitOnError = true) {
+    try {
+        const loadedSettings = JSON.parse(await fs.readFile(filePath, "utf8"));
+        Object.entries(loadedSettings).forEach(([key, value]) => {
+            if (process.env[key] === undefined) {
+                process.env[key] = value;
+            }
+        });
+    } catch (ex) {
+        console.error(`Could not load settings file ${filePath}`, ex);
+        if (exitOnError) {
+            process.exit(1);
+        }
+    }
+}
+
+await loadSettingsFile("settings.json");
 
 server.listen(PORT, "127.0.0.1", () => {
     console.log(`TRN scraper service listening on http://127.0.0.1:${PORT}`);
