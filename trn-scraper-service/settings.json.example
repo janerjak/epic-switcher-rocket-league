@@ -1,0 +1,7 @@
+{
+    "PORT": 7331,
+    "PLAYWRIGHT_BROWSER": "firefox",
+    "HEADLESS": true,
+    "SCRAPING_DEBUG": false,
+    "SCRAPING_SLOWMO": 0
+}

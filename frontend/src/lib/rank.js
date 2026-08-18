@@ -1,27 +1,27 @@
-import { GetRocketLeagueRankProfile } from '../../wailsjs/go/services/RocketLeagueRankService';
+import { GetRocketLeagueRankProfile } from "../../wailsjs/go/services/RocketLeagueRankService";
 
-export const RANK_PLAYLISTS = [
-  { value: 'duel', label: '1v1', aliases: ['duel', '1v1', 'solo', 'solos'] },
-  { value: 'double', label: '2v2', aliases: ['double', 'doubles', '2v2'] },
-  { value: 'standard', label: '3v3', aliases: ['standard', 'trio', 'trios', '3v3'] },
-  { value: 'dropshot', label: 'Dropshot', aliases: ['dropshot'] },
-  { value: 'hoops', label: 'Hoops', aliases: ['hoops'] },
-  { value: 'rumble', label: 'Rumble', aliases: ['rumble'] },
-  { value: 'snowday', label: 'Snowday', aliases: ['snowday'] },
-  { value: 'tournament', label: 'Tournament', aliases: ['tournament'] },
+export const ROCKET_LEAGUE_PLAYLISTS = [
+    { value: "duel", label: "1v1", aliases: ["duel", "1v1", "solo", "solos"] },
+    { value: "double", label: "2v2", aliases: ["double", "doubles", "2v2"] },
+    { value: "standard", label: "3v3", aliases: ["standard", "trio", "trios", "3v3"] },
+    { value: "dropshot", label: "Dropshot", aliases: ["dropshot"] },
+    { value: "hoops", label: "Hoops", aliases: ["hoops"] },
+    { value: "rumble", label: "Rumble", aliases: ["rumble"] },
+    { value: "snowday", label: "Snowday", aliases: ["snowday"] },
+    { value: "tournament", label: "Tournament", aliases: ["tournament"] },
 ];
 
 export function getRankModeLabel(mode) {
-  return RANK_PLAYLISTS.find((item) => item.value === mode)?.label || mode;
+    return ROCKET_LEAGUE_PLAYLISTS.find((item) => item.value === mode)?.label || mode;
 }
 
 export function getPlaylistLabel(mode) {
-  return getRankModeLabel(mode);
+    return getRankModeLabel(mode);
 }
 
-export async function fetchRocketLeagueRankProfile(username, platform = 'epic') {
-  const raw = await GetRocketLeagueRankProfile(username, platform);
-  return JSON.parse(raw);
+export async function fetchRocketLeagueRankProfile(username, platform = "epic") {
+    const raw = await GetRocketLeagueRankProfile(username, platform);
+    return JSON.parse(raw);
 }
 
 function getByPath(object, path) {
@@ -46,31 +46,31 @@ function normalizeRankBlock(block) {
 
 function matchesMode(text, mode) {
     const target = (text || "").toString().toLowerCase();
-    return RANK_PLAYLISTS.find((item) => item.value === mode)?.aliases.some((alias) => target.includes(alias)) || false;
+    return ROCKET_LEAGUE_PLAYLISTS.find((item) => item.value === mode)?.aliases.some((alias) => target.includes(alias)) || false;
 }
 
 export function extractRankStats(profileResponse, mode) {
-  const root = profileResponse?.data || profileResponse || {};
+    const root = profileResponse?.data || profileResponse || {};
 
-  const nestedCandidates = [`stats.ranked.${mode}`, `stats.ranked.${mode}s`, `stats.${mode}`, `ranked.${mode}`, `ranked.${mode}s`];
+    const nestedCandidates = [`stats.ranked.${mode}`, `stats.ranked.${mode}s`, `stats.${mode}`, `ranked.${mode}`, `ranked.${mode}s`];
 
     for (const path of nestedCandidates) {
         const block = getByPath(root, path);
         const normalized = normalizeRankBlock(block);
         if (normalized?.mmr != null || normalized?.imageURL || normalized?.rankName || normalized?.divisionName) {
             return normalized;
+        }
     }
-  }
 
-  const extraCandidates = [`stats.extra.${mode}`, `stats.extra.${mode}s`, `extra.${mode}`, `extra.${mode}s`];
+    const extraCandidates = [`stats.extra.${mode}`, `stats.extra.${mode}s`, `extra.${mode}`, `extra.${mode}s`];
 
-  for (const path of extraCandidates) {
-    const block = getByPath(root, path);
-    const normalized = normalizeRankBlock(block);
-    if (normalized?.mmr != null || normalized?.imageURL || normalized?.rankName || normalized?.divisionName) {
-      return normalized;
+    for (const path of extraCandidates) {
+        const block = getByPath(root, path);
+        const normalized = normalizeRankBlock(block);
+        if (normalized?.mmr != null || normalized?.imageURL || normalized?.rankName || normalized?.divisionName) {
+            return normalized;
+        }
     }
-  }
 
     const segments = root.segments || root.stats?.segments || [];
     const segment = segments.find((item) => {

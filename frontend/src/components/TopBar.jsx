@@ -13,7 +13,7 @@ import { ThemeToggle } from './ThemeToggle';
 import { LayoutToggle } from './LayoutToggle';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { RocketLeagueRankContext } from '../context/RocketLeagueRankContext';
-import { RANK_PLAYLISTS } from '../lib/rank';
+import { ROCKET_LEAGUE_PLAYLISTS } from '../lib/rank';
 
 function TopBar({ className }) {
   const { pathname } = useLocation();
@@ -90,13 +90,13 @@ function TopBar({ className }) {
               aria-expanded={isPlaylistOpen}
             >
               <span className={styles.playlistDropdownLabel}>Playlist</span>
-              <span className={styles.playlistDropdownValue}>{RANK_PLAYLISTS.find((mode) => mode.value === selectedPlaylist)?.label || selectedPlaylist}</span>
+              <span className={styles.playlistDropdownValue}>{ROCKET_LEAGUE_PLAYLISTS.find((mode) => mode.value === selectedPlaylist)?.label || selectedPlaylist}</span>
               <ChevronDown size={14} className={styles.playlistDropdownChevron} />
             </button>
 
             {isPlaylistOpen && (
               <div className={styles.playlistDropdownMenu} role="menu" aria-label="Playlist selector">
-                {RANK_PLAYLISTS.map((mode) => {
+                {ROCKET_LEAGUE_PLAYLISTS.map((mode) => {
                   const isActive = selectedPlaylist === mode.value;
                   return (
                     <button

@@ -2,66 +2,45 @@ import http from "node:http";
 import fs from "node:fs/promises";
 import path from "node:path";
 import { chromium, firefox } from "playwright";
+import {} from "./utils.js";
 
-async function loadEnvFile(filePath) {
-    try {
-        const text = await fs.readFile(filePath, "utf8");
-        for (const rawLine of text.split(/\r?\n/)) {
-            const line = rawLine.trim();
-            if (!line || line.startsWith("#")) continue;
+Array.prototype.randomElement = function () {
+    return this[Math.floor(Math.random() * this.length)];
+};
 
-            const cleaned = line.startsWith("export ") ? line.slice(7).trim() : line;
-            const eqIndex = cleaned.indexOf("=");
-            if (eqIndex === -1) continue;
-
-            const key = cleaned.slice(0, eqIndex).trim();
-            let value = cleaned.slice(eqIndex + 1).trim();
-            value = value.replace(/^['\"]|['\"]$/g, "");
-
-            if (key && process.env[key] === undefined) {
-                process.env[key] = value;
-            }
-        }
-    } catch {
-        // Optional env file.
-    }
-}
-
-await loadEnvFile(".env");
-await loadEnvFile(".env.local");
-
-const PORT = Number(process.env.PORT || 7331);
 const PROFILE_BASE_URL = "https://rocketleague.tracker.network/rocket-league/profile";
-const BROWSER = (process.env.TRN_BROWSER || "chromium").toLowerCase();
-const DEBUG = process.env.TRN_DEBUG === "1";
-const HEADLESS = process.env.TRN_HEADFUL === "1" ? false : true;
+const PORT = Number(process.env.PORT || 7331);
+const BROWSER = (process.env.PLAYWRIGHT_BROWSER || "firefox").toLowerCase();
 const DEBUG_DIR = path.resolve("debug");
 
-const PLAYLISTS = {
-    10: { group: "ranked", key: "duel" },
-    11: { group: "ranked", key: "double" },
-    13: { group: "ranked", key: "standard" },
-    27: { group: "extra", key: "hoops" },
-    28: { group: "extra", key: "rumble" },
-    29: { group: "extra", key: "dropshot" },
-    30: { group: "extra", key: "snowday" },
+const ROCKET_LEAGUE_PLAYLISTS = {
+    10: { group: "ranked", name: "duel" },
+    11: { group: "ranked", name: "double" },
+    13: { group: "ranked", name: "standard" },
+    27: { group: "extra", name: "hoops" },
+    28: { group: "extra", name: "rumble" },
+    29: { group: "extra", name: "dropshot" },
+    30: { group: "extra", name: "snowday" },
 };
 
 let browserPromise;
 
-function getBrowser() {
+function buildBrowserPromise() {
     if (!browserPromise) {
-        const browserType = BROWSER === "firefox" ? firefox : chromium;
-        browserPromise = browserType.launch({
-            headless: HEADLESS,
-            slowMo: Number(process.env.TRN_SLOWMO || 0),
+        const playwrightBrowser = {
+            firefox: firefox,
+            chromium: chromium,
+        }[BROWSER];
+        browserPromise = playwrightBrowser.launch({
+            headless: Boolean(process.env.HEADLESS) ?? true,
+            slowMo: Number(process.env.SCRAPING_SLOWMO || 0),
         });
     }
     return browserPromise;
 }
 
 async function writeDebugFiles(page, username, stage) {
-    if (!DEBUG) return;
+    if (!process.env.SCRAPING_DEBUG) return;
 
     await fs.mkdir(DEBUG_DIR, { recursive: true });
     const safeUsername = username.replace(/[^a-z0-9_-]/gi, "_");
@@ -80,10 +59,37 @@ function sendJson(response, status, payload) {
     response.end(JSON.stringify(payload));
 }
 
-function parseRating(value) {
-    if (!value) return null;
-    const match = value.replace(/,/g, "").match(/\b\d{2,5}\b/);
-    return match ? Number(match[0]) : null;
+function parseMmr(compactCells) {
+    // ^(\d+)               -> Start with one or more digits (Group 1)
+    // (?:                  -> Start a non-capturing group for the optional part
+    //   \s+                -> Match optional whitespace (includes \n)
+    //   (Top|Bottom)       -> Match either "Top" or "Bottom" (Group 2)
+    //   \s*                -> Match optional whitespace
+    //   ([\d.]+%?)         -> Match digits and dots, and an optional % sign (Group 3)
+    // )?                   -> Make the entire second group optional
+    // $                    -> End of string
+    // Flag 'i'             -> Case-insensitive (handles "top", "TOP", etc.)
+
+    function extractMmrFromCell(cell) {
+        if (!cell) return null;
+        const mmrPattern = /^([\d,.]+)(?:\s*(Top|Bottom)\s*([\d.]+%?))?$/i;
+        const matches = cell.match(mmrPattern);
+        if (!matches) return null;
+        const [_, mmr, topOrBottom, topOrBottomPercentage] = matches;
+        const cleanedMmr = mmr.replace(",", "").replace(".", "");
+        return { mmr: Number(cleanedMmr), topOrBottom, topOrBottomPercentage };
+    }
+
+    const expectedMmrCellIndex = 1;
+    const expectedCellResult = extractMmrFromCell(compactCells.at(expectedMmrCellIndex));
+    if (expectedCellResult) return expectedCellResult;
+
+    for (const [index, cell] of compactCells.entries()) {
+        if (index == expectedMmrCellIndex) continue;
+        const extractedFromCell = extractMmrFromCell(cell);
+        if (extractMmrFromCell) return extractedFromCell;
+    }
+    return null;
 }
 
 function parseDivision(value) {
@@ -91,17 +97,38 @@ function parseDivision(value) {
     return match ? `Div ${match[1]}` : null;
 }
 
+function parseExtraData(compactCells, mmrData) {
+    function parseMatchCounts(cell) {
+        const matchesAndWinStreakPattern = /^(\d+)(?:\s+(Win|Loss) Strk\.\s+([\d.]+))?$/i;
+        const matches = cell?.match(matchesAndWinStreakPattern);
+        if (matches) {
+            const [_, playedMatchCount, winOrLossStreak, streakMatchCount] = matches;
+            return { playedMatchCount: Number(playedMatchCount), winOrLossStreak, streakMatchCount: Number(streakMatchCount) };
+        }
+        return null;
+    }
+    try {
+        const potentialPeakMmr = Number(compactCells[4]);
+        const peakMmr = potentialPeakMmr >= (mmrData?.mmr ?? 0) ? potentialPeakMmr : null;
+        return { peakMmr, matchCounts: parseMatchCounts(compactCells.at(5)) };
+    } catch (ex) {
+        console.error(`Error during extra data parsing on ${compactCells} (with mmr data ${mmrData})`, ex);
+        return null;
+    }
+}
+
 function normalizeRow(row) {
-    const playlist = PLAYLISTS[row.playlistId];
+    const playlist = ROCKET_LEAGUE_PLAYLISTS[row.playlistId];
     if (!playlist) return null;
 
-    const rating = parseRating(row.ratingText);
     const divisionName = parseDivision(row.rankText);
+    const mmrData = parseMmr(row.compactCells);
+    const extraData = parseExtraData(row.compactCells, mmrData);
 
     return {
-        group: playlist.group,
-        key: playlist.key,
-        value: {
+        playlistGroup: playlist.group,
+        playlistName: playlist.name,
+        playlistData: {
             rank: {
                 tier: {
                     name: row.rankName || null,
@@ -111,8 +138,10 @@ function normalizeRow(row) {
                 },
                 imageURL: row.rankImageURL || null,
             },
-            mmr: rating,
-            raw: row,
+            mmr: mmrData?.mmr,
+            mmrData,
+            extraData,
+            rawCellData: row,
         },
     };
 }
@@ -133,18 +162,23 @@ async function waitForProfileContent(page) {
 
 async function scrapeProfile(platform, username) {
     console.log(`Scraping profile of ${platform}:${username}`);
-    const browser = await getBrowser();
+    const browser = await buildBrowserPromise();
     const context = await browser.newContext({
         locale: "en-US",
-        userAgent: "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/121.0.0.0 Safari/537.36",
+        userAgent: [
+            //"Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
+            //"AppleWebKit/537.36 (KHTML, like Gecko)",
+            "Chrome/121.0.0.0 (Windows NT 10.0; Win64; x64)",
+            //"Safari/537.36",
+        ].randomElement(),
         viewport: { width: 1366, height: 900 },
     });
     const page = await context.newPage();
     console.log(`Browser opened new page`);
 
     try {
-        page.setDefaultTimeout(45000);
-        page.setDefaultNavigationTimeout(45000);
+        page.setDefaultTimeout(10000);
+        page.setDefaultNavigationTimeout(10000);
 
         await page.route("**/*", (route) => {
             const request = route.request();
@@ -207,7 +241,7 @@ async function scrapeProfile(platform, username) {
         for (const row of rows) {
             const normalized = normalizeRow(row);
             if (!normalized) continue;
-            stats[normalized.group][normalized.key] = normalized.value;
+            stats[normalized.playlistGroup][normalized.playlistName] = normalized.playlistData;
         }
 
         return {
@@ -263,8 +297,23 @@ const server = http.createServer(async (request, response) => {
     }
 });
 
-await loadEnvFile(".env");
-await loadEnvFile(".env.local");
+async function loadSettingsFile(filePath, exitOnError = true) {
+    try {
+        const loadedSettings = JSON.parse(await fs.readFile(filePath, "utf8"));
+        Object.entries(loadedSettings).forEach(([key, value]) => {
+            if (process.env[key] === undefined) {
+                process.env[key] = value;
+            }
+        });
+    } catch (ex) {
+        console.error(`Could not load settings file ${filePath}`, ex);
+        if (exitOnError) {
+            process.exit(1);
+        }
+    }
+}
+
+await loadSettingsFile("settings.json");
 
 server.listen(PORT, "127.0.0.1", () => {
     console.log(`TRN scraper service listening on http://127.0.0.1:${PORT}`);
